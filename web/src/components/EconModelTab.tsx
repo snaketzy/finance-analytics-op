@@ -11,6 +11,10 @@ import {
   type EconPayload,
   type EconScenarioKey,
   type EconSensitivityRow,
+  type CdnTier,
+  type CdnPackage,
+  type CdnPricingMode,
+  type CdnPackagePrice,
   type EconVars,
 } from '../api';
 import { Card, CardHeader, Empty } from './Card';
@@ -40,8 +44,20 @@ type Draft = {
   r2ClassAMonthlyCny: string;
   libraryTitles: string;
   avgTitleGb: string;
+  /** 单档兜底价（历史快照沿用；UI 改为编辑阶梯后不再直接输入） */
   cdnTier1PerTbCny: string;
   cdnTier2PerTbCny: string;
+  /** 固定 5 档单价（字符串，与 CDN_TIER_BOUNDS 一一对应） */
+  cdnTier1Prices: string[];
+  cdnTier2Prices: string[];
+  /** CDN 计价模式与资源包价格档 */
+  cdnPricingMode: CdnPricingMode;
+  cdnPackagePrice: CdnPackagePrice;
+  /** 资源包 6 档价格（字符串，与 CDN_PACKAGE_BOUNDS 一一对应） */
+  cdnTier1ListPrices: string[];
+  cdnTier1RenewPrices: string[];
+  cdnTier2ListPrices: string[];
+  cdnTier2RenewPrices: string[];
   tier1SharePct: string;
   viewers: string;
   titlesPerViewer: string;
@@ -71,6 +87,76 @@ const parsePct = (s: string): number | null => {
   return n === null ? null : n / 100;
 };
 
+/* ------------------------------------------------------------------ */
+/* CDN 阶梯：固定 5 档，仅单价可调（腾讯云「月度阶梯累进」口径）            */
+/* ------------------------------------------------------------------ */
+
+/** 档位边界（upToTb = null 表示无上限的末档）。 */
+const CDN_TIER_BOUNDS: { upToTb: number | null; label: string }[] = [
+  { upToTb: 2, label: '0–2 TB' },
+  { upToTb: 10, label: '2–10 TB' },
+  { upToTb: 50, label: '10–50 TB' },
+  { upToTb: 100, label: '50–100 TB' },
+  { upToTb: null, label: '≥100 TB' },
+];
+
+/** 腾讯云 CDN 流量刊例价（¥/TB）：境外亚太一区 / 亚太二区。 */
+const TENCENT_LIST_PRICE = {
+  tier1: ['460', '410', '370', '330', '310'],
+  tier2: ['550', '510', '470', '410', '350'],
+};
+
+/** 阶梯数组 → 5 个字符串单价（不足处补空）。 */
+function tiersToPrices(tiers: CdnTier[] | null | undefined): string[] {
+  return CDN_TIER_BOUNDS.map((_, i) => numStr(tiers?.[i]?.pricePerTbCny));
+}
+
+/** 5 个字符串单价 → 阶梯数组（全空视为「未启用阶梯」，回落单档价）。 */
+function pricesToTiers(prices: string[]): CdnTier[] | null {
+  const parsed = prices.map((p) => parseNum(p));
+  if (parsed.every((p) => p === null)) return null;
+  return CDN_TIER_BOUNDS.map((b, i) => ({ upToTb: b.upToTb, pricePerTbCny: parsed[i] ?? 0 }));
+}
+
+/* ------------------------------------------------------------------ */
+/* CDN 资源包：固定 6 档容量，可编辑「刊例价 / 续订价」两套价格             */
+/* ------------------------------------------------------------------ */
+
+/** 资源包档位容量（GB，与腾讯云「预付费流量包」一致）。 */
+const CDN_PACKAGE_BOUNDS: { sizeGb: number; label: string }[] = [
+  { sizeGb: 100, label: '100 GB' },
+  { sizeGb: 500, label: '500 GB' },
+  { sizeGb: 1000, label: '1 TB' },
+  { sizeGb: 5000, label: '5 TB' },
+  { sizeGb: 10000, label: '10 TB' },
+  { sizeGb: 50000, label: '50 TB' },
+];
+
+/** 腾讯云 CDN 流量包价格（¥/包）：单次购买刊例价 / 连续包月自动续订价。 */
+const TENCENT_PACKAGE_PRICE = {
+  tier1: {
+    list: ['46', '230', '460', '2150', '4200', '19000'],
+    renew: ['42.80', '209.00', '413.30', '1995.00', '3895.00', '17575.00'],
+  },
+  tier2: {
+    list: ['55', '275', '550', '2630', '5180', '23980'],
+    renew: ['51.30', '228.00', '446.50', '2042.50', '3990.00', '19475.00'],
+  },
+};
+
+/** 资源包数组 → 6 个字符串价格（按 list / renew 取值，不足处补空）。 */
+function packagesToPrices(pkgs: CdnPackage[] | null | undefined, key: 'listCny' | 'renewCny'): string[] {
+  return CDN_PACKAGE_BOUNDS.map((_, i) => numStr(pkgs?.[i]?.[key]));
+}
+
+/** 两套字符串价格 → 资源包数组（两套全空视为「未配置」，返回 null）。 */
+function pricesToPackages(list: string[], renew: string[]): CdnPackage[] | null {
+  const l = list.map((p) => parseNum(p));
+  const r = renew.map((p) => parseNum(p));
+  if (l.every((p) => p === null) && r.every((p) => p === null)) return null;
+  return CDN_PACKAGE_BOUNDS.map((b, i) => ({ sizeGb: b.sizeGb, listCny: l[i] ?? 0, renewCny: r[i] ?? 0 }));
+}
+
 function toDraft(v: EconVars): Draft {
   return {
     vultrMonthlyCny: numStr(v.vultrMonthlyCny),
@@ -82,6 +168,14 @@ function toDraft(v: EconVars): Draft {
     avgTitleGb: numStr(v.avgTitleGb),
     cdnTier1PerTbCny: numStr(v.cdnTier1PerTbCny),
     cdnTier2PerTbCny: numStr(v.cdnTier2PerTbCny),
+    cdnTier1Prices: tiersToPrices(v.cdnTier1Tiers),
+    cdnTier2Prices: tiersToPrices(v.cdnTier2Tiers),
+    cdnPricingMode: v.cdnPricingMode ?? 'tiered',
+    cdnPackagePrice: v.cdnPackagePrice ?? 'renew',
+    cdnTier1ListPrices: packagesToPrices(v.cdnTier1Packages, 'listCny'),
+    cdnTier1RenewPrices: packagesToPrices(v.cdnTier1Packages, 'renewCny'),
+    cdnTier2ListPrices: packagesToPrices(v.cdnTier2Packages, 'listCny'),
+    cdnTier2RenewPrices: packagesToPrices(v.cdnTier2Packages, 'renewCny'),
     tier1SharePct: pctStr(v.tier1Share),
     viewers: numStr(v.viewers),
     titlesPerViewer: numStr(v.titlesPerViewer),
@@ -99,8 +193,12 @@ function toDraft(v: EconVars): Draft {
   };
 }
 
-/** 全量转回变量（发送完整 23 字段，避免后端按 null 覆盖其它字段）。 */
+/** 全量转回变量（发送完整字段，避免后端按 null 覆盖其它字段）。 */
 function draftToVars(d: Draft): EconVars {
+  const tier1 = pricesToTiers(d.cdnTier1Prices);
+  const tier2 = pricesToTiers(d.cdnTier2Prices);
+  const pkg1 = pricesToPackages(d.cdnTier1ListPrices, d.cdnTier1RenewPrices);
+  const pkg2 = pricesToPackages(d.cdnTier2ListPrices, d.cdnTier2RenewPrices);
   return {
     vultrMonthlyCny: parseNum(d.vultrMonthlyCny),
     domainAnnualCny: parseNum(d.domainAnnualCny),
@@ -109,8 +207,15 @@ function draftToVars(d: Draft): EconVars {
     r2ClassAMonthlyCny: parseNum(d.r2ClassAMonthlyCny),
     libraryTitles: parseNum(d.libraryTitles),
     avgTitleGb: parseNum(d.avgTitleGb),
-    cdnTier1PerTbCny: parseNum(d.cdnTier1PerTbCny),
-    cdnTier2PerTbCny: parseNum(d.cdnTier2PerTbCny),
+    // 有阶梯时以首档价作为「单档兜底价」，保证无阶梯的历史口径仍可复现
+    cdnTier1PerTbCny: tier1 ? tier1[0].pricePerTbCny : parseNum(d.cdnTier1PerTbCny),
+    cdnTier2PerTbCny: tier2 ? tier2[0].pricePerTbCny : parseNum(d.cdnTier2PerTbCny),
+    cdnTier1Tiers: tier1,
+    cdnTier2Tiers: tier2,
+    cdnPricingMode: d.cdnPricingMode,
+    cdnPackagePrice: d.cdnPackagePrice,
+    cdnTier1Packages: pkg1,
+    cdnTier2Packages: pkg2,
     tier1Share: parsePct(d.tier1SharePct),
     viewers: parseNum(d.viewers),
     titlesPerViewer: parseNum(d.titlesPerViewer),
@@ -138,6 +243,12 @@ const EMPTY_VARS: EconVars = {
   avgTitleGb: null,
   cdnTier1PerTbCny: null,
   cdnTier2PerTbCny: null,
+  cdnTier1Tiers: null,
+  cdnTier2Tiers: null,
+  cdnPricingMode: 'tiered',
+  cdnPackagePrice: 'renew',
+  cdnTier1Packages: null,
+  cdnTier2Packages: null,
   tier1Share: null,
   viewers: null,
   titlesPerViewer: null,
@@ -165,6 +276,8 @@ type FieldDef = {
   unit?: string;
   step?: string;
   placeholder?: string;
+  /** 整卡实收倍数（季卡 ×3 / 年卡 ×12）：在输入框内 ¥ 左侧显示「单价 × 倍数」的实收金额。 */
+  mult?: number;
 };
 
 const GROUPS: { cn: string; en: string; fields: FieldDef[] }[] = [
@@ -191,8 +304,6 @@ const GROUPS: { cn: string; en: string; fields: FieldDef[] }[] = [
     cn: 'CDN 流量（腾讯云香港）',
     en: 'CDN Traffic',
     fields: [
-      { key: 'cdnTier1PerTbCny', label: 'F · 亚太一区单价', hint: 'APAC-1', unit: '¥/TB', placeholder: '如 260' },
-      { key: 'cdnTier2PerTbCny', label: 'G · 亚太二区单价', hint: 'APAC-2', unit: '¥/TB', placeholder: '如 380' },
       { key: 'tier1SharePct', label: 'α · 亚太一区占比', hint: '余下走二区', unit: '%', step: '0.1', placeholder: '如 80' },
       { key: 'viewers', label: 'H · 月观看人数', hint: 'Viewers', unit: '人', placeholder: '如 5000' },
       { key: 'titlesPerViewer', label: 'I · 人均月观影', hint: 'Titles / Viewer', unit: '部', step: '0.1', placeholder: '如 8' },
@@ -207,9 +318,9 @@ const GROUPS: { cn: string; en: string; fields: FieldDef[] }[] = [
       { key: 'monthlySubs', label: 'L1 · 月卡订阅人数', hint: 'Monthly', unit: '人', placeholder: '如 800' },
       { key: 'monthlyPriceCny', label: 'M1 · 月卡单价', hint: '¥/月', unit: '¥', placeholder: '如 30' },
       { key: 'quarterlySubs', label: 'L2 · 季卡订阅人数', hint: '实收 ×3', unit: '人', placeholder: '如 300' },
-      { key: 'quarterlyPriceCny', label: 'M2 · 季卡单价', hint: '¥/月 × 3', unit: '¥', placeholder: '如 25' },
+      { key: 'quarterlyPriceCny', label: 'M2 · 季卡单价', hint: '¥/月 × 3', unit: '¥', placeholder: '如 25', mult: 3 },
       { key: 'yearlySubs', label: 'L3 · 年卡订阅人数', hint: '实收 ×12', unit: '人', placeholder: '如 200' },
-      { key: 'yearlyPriceCny', label: 'M3 · 年卡单价', hint: '¥/月 × 12', unit: '¥', placeholder: '如 20' },
+      { key: 'yearlyPriceCny', label: 'M3 · 年卡单价', hint: '¥/月 × 12', unit: '¥', placeholder: '如 20', mult: 12 },
     ],
   },
   {
@@ -435,7 +546,33 @@ export default function EconModelTab({ productId, fxRate }: { productId: number;
   const neutral: EconMetrics | undefined = model?.results.neutral;
   const reference = model?.reference;
 
-  const set = (key: keyof Draft, value: string) => setDraft((d) => ({ ...d, [key]: value }));
+  const set = (key: keyof Draft, value: string) =>
+    setDraft((d) => ({ ...d, [key]: value }) as Draft);
+
+  /** 修改某一档的单价。 */
+  const setTierPrice = (key: 'cdnTier1Prices' | 'cdnTier2Prices', index: number, value: string) =>
+    setDraft((d) => ({ ...d, [key]: d[key].map((p, i) => (i === index ? value : p)) }));
+
+  /** 修改资源包某一档的价格（list = 刊例价 / renew = 续订价）。 */
+  const setPackagePrice = (
+    key: 'cdnTier1ListPrices' | 'cdnTier1RenewPrices' | 'cdnTier2ListPrices' | 'cdnTier2RenewPrices',
+    index: number,
+    value: string
+  ) => setDraft((d) => ({ ...d, [key]: d[key].map((p, i) => (i === index ? value : p)) }));
+
+  /** 一键填入腾讯云 CDN 流量刊例价（亚太一区 / 亚太二区）。 */
+  const applyTencentList = () =>
+    setDraft((d) => ({ ...d, cdnTier1Prices: [...TENCENT_LIST_PRICE.tier1], cdnTier2Prices: [...TENCENT_LIST_PRICE.tier2] }));
+
+  /** 一键填入腾讯云 CDN 流量包价格（刊例价 + 续订价，亚太一区 / 亚太二区）。 */
+  const applyTencentPackages = () =>
+    setDraft((d) => ({
+      ...d,
+      cdnTier1ListPrices: [...TENCENT_PACKAGE_PRICE.tier1.list],
+      cdnTier1RenewPrices: [...TENCENT_PACKAGE_PRICE.tier1.renew],
+      cdnTier2ListPrices: [...TENCENT_PACKAGE_PRICE.tier2.list],
+      cdnTier2RenewPrices: [...TENCENT_PACKAGE_PRICE.tier2.renew],
+    }));
 
   async function handleSave() {
     setError(null);
@@ -465,6 +602,8 @@ export default function EconModelTab({ productId, fxRate }: { productId: number;
 
   /** 删除某一历史版本快照（当前选中版本不提供删除入口）。 */
   async function handleDeleteSnapshot(snapshotId: number) {
+    const when = fmtSavedAt(history?.snapshots.find((s) => s.id === snapshotId)?.savedAt ?? null);
+    if (!window.confirm(`确认删除历史版本「${when}」的测算假设？删除后不可恢复。`)) return;
     setError(null);
     try {
       await deleteSnapshot({ productId, snapshotId }).unwrap();
@@ -483,11 +622,11 @@ export default function EconModelTab({ productId, fxRate }: { productId: number;
   if (isLoading && !model) return <Empty text="加载全变量测算…" />;
   if (!model || !neutral) return <Empty text="暂无变量数据" />;
 
-  // CDN 消耗流量区间：H × I × 单片流量（上限取 K、下限取 J）÷ 1024 换算 TB
+  // CDN 消耗流量区间：H × I × 单片流量（上限取 K、下限取 J）÷ 1000 换算 TB
   const gb = gbRange(vars.perTitleGbLow, vars.perTitleGbHigh);
   const trafficBase = (vars.viewers ?? 0) * (vars.titlesPerViewer ?? 0);
-  const trafficLowTb = (trafficBase * gb.low) / 1024;
-  const trafficHighTb = (trafficBase * gb.high) / 1024;
+  const trafficLowTb = (trafficBase * gb.low) / 1000;
+  const trafficHighTb = (trafficBase * gb.high) / 1000;
 
   const curves = SCEN.map((s) => model.curves[s.key]);
   const sharedMaxX = Math.max(...curves.map((c) => c.maxViewers), 1);
@@ -685,28 +824,152 @@ export default function EconModelTab({ productId, fxRate }: { productId: number;
                 <span className="text-[10px] uppercase tracking-wide text-slate-600">{g.en}</span>
               </div>
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-                {g.fields.map((f) => (
-                  <Field key={f.key} label={f.label} hint={f.hint}>
-                    <div className="relative">
-                      <Input
-                        type="number"
-                        min="0"
-                        step={f.step ?? '1'}
-                        value={draft[f.key]}
-                        onChange={(e) => set(f.key, e.target.value)}
-                        placeholder={f.placeholder}
-                        className="pr-12"
-                      />
-                      {f.unit ? (
-                        <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-slate-500">
-                          {f.unit}
+                {g.fields.map((f) => {
+                  const raw = draft[f.key];
+                  const unitPrice = f.mult && typeof raw === 'string' ? parseNum(raw) : null;
+                  const actualCny = unitPrice != null ? unitPrice * (f.mult as number) : null;
+                  return (
+                    <Field key={f.key} label={f.label} hint={f.hint}>
+                      <div className="relative">
+                        <Input
+                          type="number"
+                          min="0"
+                          step={f.step ?? '1'}
+                          value={draft[f.key]}
+                          onChange={(e) => set(f.key, e.target.value)}
+                          placeholder={f.placeholder}
+                          className={f.mult ? 'pr-20' : 'pr-12'}
+                        />
+                        <span className="pointer-events-none absolute inset-y-0 right-2 flex items-center gap-1 text-[10px]">
+                          {actualCny != null ? (
+                            <span className="font-medium tabular-nums text-emerald-400">
+                              {formatCny(actualCny)}
+                            </span>
+                          ) : null}
+                          {f.unit ? <span className="text-slate-500">{f.unit}</span> : null}
                         </span>
-                      ) : null}
-                    </div>
-                  </Field>
-                ))}
+                      </div>
+                    </Field>
+                  );
+                })}
                 {g.en === 'CDN Traffic' ? (
                   <>
+                    <div className="col-span-full space-y-3 rounded-lg border border-slate-800 bg-slate-950/40 p-3">
+                      <div className="grid grid-cols-2 gap-3">
+                        <Field label="计价模式" hint="Pricing Mode">
+                          <Select value={draft.cdnPricingMode} onChange={(e) => set('cdnPricingMode', e.target.value)}>
+                            <option value="tiered">按量 · 阶梯累进</option>
+                            <option value="package">预付费 · 流量包</option>
+                          </Select>
+                        </Field>
+                        <Field label="价格档" hint={draft.cdnPricingMode === 'package' ? 'Package Price' : '仅资源包模式生效'}>
+                          <Select
+                            value={draft.cdnPackagePrice}
+                            onChange={(e) => set('cdnPackagePrice', e.target.value)}
+                            disabled={draft.cdnPricingMode !== 'package'}
+                          >
+                            <option value="renew">连续包月 · 续订价</option>
+                            <option value="list">单次购买 · 刊例价</option>
+                          </Select>
+                        </Field>
+                      </div>
+
+                      {draft.cdnPricingMode === 'tiered' ? (
+                        <>
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <span className="text-[11px] text-slate-400">
+                              F / G · 阶梯单价（月度阶梯累进：每档仅对落入该档区间的流量计价，再求和）
+                            </span>
+                            <Button size="sm" variant="ghost" onClick={applyTencentList}>
+                              填入腾讯云刊例价
+                            </Button>
+                          </div>
+                          {(
+                            [
+                              { key: 'cdnTier1Prices' as const, label: 'F · 亚太一区', hint: 'APAC-1' },
+                              { key: 'cdnTier2Prices' as const, label: 'G · 亚太二区', hint: 'APAC-2' },
+                            ]
+                          ).map((row) => (
+                            <div key={row.key}>
+                              <div className="mb-1 flex items-baseline gap-2">
+                                <span className="text-[11px] font-medium text-slate-300">{row.label}</span>
+                                <span className="text-[10px] text-slate-600">{row.hint}</span>
+                              </div>
+                              <div className="grid grid-cols-5 gap-2">
+                                {CDN_TIER_BOUNDS.map((b, i) => (
+                                  <div key={i}>
+                                    <div className="mb-1 text-center text-[10px] text-slate-500">{b.label}</div>
+                                    <div className="relative">
+                                      <Input
+                                        type="number"
+                                        min="0"
+                                        step="1"
+                                        value={draft[row.key][i] ?? ''}
+                                        onChange={(e) => setTierPrice(row.key, i, e.target.value)}
+                                        placeholder="未填"
+                                        className="pr-10"
+                                      />
+                                      <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-slate-500">
+                                        ¥/TB
+                                      </span>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          ))}
+                        </>
+                      ) : (
+                        <>
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <span className="text-[11px] text-slate-400">
+                              F / G · 流量包价格（预付费资源包：按月覆盖流量的最省整包组合，上为刊例价 / 下为续订价）
+                            </span>
+                            <Button size="sm" variant="ghost" onClick={applyTencentPackages}>
+                              填入腾讯云资源包价
+                            </Button>
+                          </div>
+                          {(
+                            [
+                              { listKey: 'cdnTier1ListPrices' as const, renewKey: 'cdnTier1RenewPrices' as const, label: 'F · 亚太一区', hint: 'APAC-1' },
+                              { listKey: 'cdnTier2ListPrices' as const, renewKey: 'cdnTier2RenewPrices' as const, label: 'G · 亚太二区', hint: 'APAC-2' },
+                            ]
+                          ).map((row) => (
+                            <div key={row.listKey}>
+                              <div className="mb-1 flex items-baseline gap-2">
+                                <span className="text-[11px] font-medium text-slate-300">{row.label}</span>
+                                <span className="text-[10px] text-slate-600">{row.hint}</span>
+                              </div>
+                              <div className="grid grid-cols-6 gap-2">
+                                {CDN_PACKAGE_BOUNDS.map((b, i) => (
+                                  <div key={i}>
+                                    <div className="mb-1 text-center text-[10px] text-slate-500">{b.label}</div>
+                                    <div className="space-y-1">
+                                      <Input
+                                        type="number"
+                                        min="0"
+                                        step="0.01"
+                                        value={draft[row.listKey][i] ?? ''}
+                                        onChange={(e) => setPackagePrice(row.listKey, i, e.target.value)}
+                                        placeholder="刊例价"
+                                      />
+                                      <Input
+                                        type="number"
+                                        min="0"
+                                        step="0.01"
+                                        value={draft[row.renewKey][i] ?? ''}
+                                        onChange={(e) => setPackagePrice(row.renewKey, i, e.target.value)}
+                                        placeholder="续订价"
+                                      />
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          ))}
+                        </>
+                      )}
+                    </div>
                     <ReadOnlyStat label="消耗流量下限" hint="H × I × J" value={fmtQty(trafficLowTb)} unit="TB" />
                     <ReadOnlyStat label="消耗流量上限" hint="H × I × K" value={fmtQty(trafficHighTb)} unit="TB" />
                   </>

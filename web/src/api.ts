@@ -102,6 +102,8 @@ export type Category = {
   parentId: number | null;
   nameCn: string;
   nameEn: string;
+  /** 科目说明（口径/用途），可为空。 */
+  note: string | null;
   type: CategoryType;
   domain: string;
   isRecurring: boolean | number;
@@ -114,6 +116,8 @@ export type CategoryInput = {
   parentId?: number | null;
   nameCn: string;
   nameEn: string;
+  /** 科目说明（空串会被后端归一化为 NULL）。 */
+  note?: string | null;
   type: CategoryType;
   /** 顶层节点的领域 key；子科目领域由后端跟随父级，无需传。 */
   domain?: string;
@@ -496,6 +500,8 @@ export type GenerateResult = { id: number; until: string; generated: number; las
 
 /* ------------------------------ P2 · 预算 ------------------------------ */
 
+export type BudgetPeriodType = 'monthly' | 'yearly' | 'once';
+
 export type Budget = {
   id: number;
   projectId: number;
@@ -506,7 +512,7 @@ export type Budget = {
   categoryNameEn: string | null;
   domain: string | null;
   period: string;
-  periodType: 'monthly' | 'yearly';
+  periodType: BudgetPeriodType;
   amountCny: number;
   budgetUsd: number | null;
   actualCny: number;
@@ -533,7 +539,7 @@ export type BudgetInput = {
   projectId: number;
   categoryId?: number | null;
   period: string;
-  periodType?: 'monthly' | 'yearly';
+  periodType?: BudgetPeriodType;
   amountCny: number;
 };
 
@@ -903,6 +909,31 @@ export type UESaveInputsInput = {
 /** 全变量测算情景：悲观取单片流量上限 K、乐观取下限 J。 */
 export type EconScenarioKey = 'pessimistic' | 'neutral' | 'optimistic';
 
+/**
+ * CDN 流量阶梯档位（腾讯云「月度阶梯累进」口径）。
+ * upToTb = 该档流量上限（TB），null 表示无上限（末档）；
+ * pricePerTbCny = 落入该档区间的流量单价 ¥/TB。
+ */
+export type CdnTier = {
+  upToTb: number | null;
+  pricePerTbCny: number;
+};
+
+/** CDN 计价模式：tiered = 按量阶梯累进，package = 预付费流量包。 */
+export type CdnPricingMode = 'tiered' | 'package';
+/** 资源包价格档：renew = 连续包月自动续订价，list = 单次购买刊例价。 */
+export type CdnPackagePrice = 'list' | 'renew';
+
+/**
+ * CDN 预付费流量包单档（固定 6 档：100GB / 500GB / 1TB / 5TB / 10TB / 50TB）。
+ * sizeGb 为包容量，listCny / renewCny 为两种价格档下的整包价格 ¥。
+ */
+export type CdnPackage = {
+  sizeGb: number;
+  listCny: number;
+  renewCny: number;
+};
+
 /** 全变量测算输入（NULL = 未填，计算时按 0 处理）。 */
 export type EconVars = {
   /** A 云主机月租 ¥/月 */
@@ -919,10 +950,22 @@ export type EconVars = {
   libraryTitles: number | null;
   /** E 单片平均体积 GB */
   avgTitleGb: number | null;
-  /** F 亚太一区 ¥/TB */
+  /** F 亚太一区 ¥/TB（阶梯缺失时的单档兜底价） */
   cdnTier1PerTbCny: number | null;
-  /** G 亚太二区 ¥/TB */
+  /** G 亚太二区 ¥/TB（阶梯缺失时的单档兜底价） */
   cdnTier2PerTbCny: number | null;
+  /** F 亚太一区阶梯单价（固定 5 档，空 = 按 F 单档计） */
+  cdnTier1Tiers: CdnTier[] | null;
+  /** G 亚太二区阶梯单价（固定 5 档，空 = 按 G 单档计） */
+  cdnTier2Tiers: CdnTier[] | null;
+  /** CDN 计价模式（空 = tiered） */
+  cdnPricingMode: CdnPricingMode | null;
+  /** 资源包价格档（空 = renew） */
+  cdnPackagePrice: CdnPackagePrice | null;
+  /** F 亚太一区资源包（固定 6 档） */
+  cdnTier1Packages: CdnPackage[] | null;
+  /** G 亚太二区资源包（固定 6 档） */
+  cdnTier2Packages: CdnPackage[] | null;
   /** α 亚太一区流量占比 0-1 */
   tier1Share: number | null;
   /** H 月观看人数 */

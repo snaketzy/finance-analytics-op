@@ -27,6 +27,7 @@ type FormState = {
   domain: string;
   nameCn: string;
   nameEn: string;
+  note: string;
   isRecurring: boolean;
   isCogs: boolean;
   sortOrder: string;
@@ -40,6 +41,7 @@ function emptyForm(type: CategoryType = 'expense'): FormState {
     domain: domainOptions(type)[0]?.key ?? '',
     nameCn: '',
     nameEn: '',
+    note: '',
     isRecurring: false,
     isCogs: false,
     sortOrder: '',
@@ -99,7 +101,10 @@ function DomainSection({
                   key={c.id}
                   className="group flex items-baseline justify-between gap-3 rounded px-2 py-1 hover:bg-slate-800/50"
                 >
-                  <span className="truncate text-xs text-slate-200">{c.nameCn}</span>
+                  <span className="min-w-0 flex-1 truncate text-xs text-slate-200" title={c.note ?? undefined}>
+                    {c.nameCn}
+                    {c.note ? <span className="ml-1.5 text-[10px] font-normal text-slate-500">{c.note}</span> : null}
+                  </span>
                   <div className="flex shrink-0 items-center gap-2">
                     {c.isCogs ? (
                       <span className="rounded bg-slate-800 px-1 text-[10px] text-amber-400" title="计入 COGS">
@@ -183,6 +188,7 @@ export default function Categories() {
       domain: c.domain,
       nameCn: c.nameCn,
       nameEn: c.nameEn,
+      note: c.note ?? '',
       isRecurring: Boolean(c.isRecurring),
       isCogs: Boolean(c.isCogs),
       sortOrder: String(c.sortOrder ?? ''),
@@ -219,6 +225,7 @@ export default function Categories() {
         const body: Partial<CategoryInput> = {
           nameCn,
           nameEn,
+          note: form.note.trim(),
           isRecurring: form.isRecurring,
           isCogs: form.isCogs,
           ...(sortOrder !== undefined ? { sortOrder } : {}),
@@ -229,6 +236,7 @@ export default function Categories() {
         const body: CategoryInput = {
           nameCn,
           nameEn,
+          note: form.note.trim(),
           type: form.type,
           isRecurring: form.isRecurring,
           isCogs: form.isCogs,
@@ -380,6 +388,16 @@ export default function Categories() {
           <Field label="英文名 Name (EN)">
             <Input value={form.nameEn} onChange={(e) => setForm({ ...form, nameEn: e.target.value })} />
           </Field>
+          <div className="sm:col-span-2">
+            <Field label="说明 Note" hint="口径 / 用途（选填）">
+              <Input
+                value={form.note}
+                onChange={(e) => setForm({ ...form, note: e.target.value })}
+                placeholder="如：CDN 出流量按亚太一区/二区加权计价"
+                maxLength={255}
+              />
+            </Field>
+          </div>
           <label className="flex items-center gap-2 text-xs text-slate-300">
             <input
               type="checkbox"

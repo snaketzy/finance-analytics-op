@@ -17,11 +17,18 @@ function domainsFor(type: string): string[] {
 }
 
 const BASE_SELECT = `
-  SELECT id, parent_id AS parentId, name_cn AS nameCn, name_en AS nameEn,
+  SELECT id, parent_id AS parentId, name_cn AS nameCn, name_en AS nameEn, note,
          type, domain, is_recurring AS isRecurring, is_cogs AS isCogs,
          sort_order AS sortOrder
     FROM categories
 `;
+
+/** 归一化科目说明：去空格，空串视为 NULL。 */
+function normalizeNote(v: unknown): string | null {
+  if (v === undefined || v === null) return null;
+  const s = String(v).trim();
+  return s ? s : null;
+}
 
 /**
  * 生成下一个科目 id（沿用既有层级编号约定，id 列无 AUTO_INCREMENT）：
@@ -50,7 +57,7 @@ export default async function (app: FastifyInstance) {
   app.get('/', async (req) => {
     const q = req.query as { type?: string };
     const params: unknown[] = [];
-    let sql = `SELECT id, parent_id AS parentId, name_cn AS nameCn, name_en AS nameEn,
+    let sql = `SELECT id, parent_id AS parentId, name_cn AS nameCn, name_en AS nameEn, note,
                       type, domain, is_recurring AS isRecurring, is_cogs AS isCogs,
                       sort_order AS sortOrder
                  FROM categories
@@ -103,6 +110,7 @@ export default async function (app: FastifyInstance) {
 
     const isRecurring = b.isRecurring ? 1 : 0;
     const isCogs = b.isCogs ? 1 : 0;
+    const note = normalizeNote(b.note);
     let sortOrder = b.sortOrder !== undefined && b.sortOrder !== '' ? Number(b.sortOrder) : null;
     if (sortOrder === null || !Number.isFinite(sortOrder)) {
       const [mx] = await pool.query<Row[]>(
@@ -117,9 +125,9 @@ export default async function (app: FastifyInstance) {
     const newId = await nextCategoryId(parentId, type);
     await pool.query<ResultSetHeader>(
       `INSERT INTO categories
-         (id, parent_id, name_cn, name_en, type, domain, is_recurring, is_cogs, sort_order, status)
-       VALUES (?,?,?,?,?,?,?,?,?,1)`,
-      [newId, parentId, nameCn, nameEn, type, domain, isRecurring, isCogs, sortOrder]
+         (id, parent_id, name_cn, name_en, note, type, domain, is_recurring, is_cogs, sort_order, status)
+       VALUES (?,?,?,?,?,?,?,?,?,?,1)`,
+      [newId, parentId, nameCn, nameEn, note, type, domain, isRecurring, isCogs, sortOrder]
     );
     const [rows] = await pool.query<Row[]>(`${BASE_SELECT} WHERE id = ?`, [newId]);
     reply.code(201);
@@ -157,6 +165,7 @@ export default async function (app: FastifyInstance) {
     }
     if (b.isRecurring !== undefined) { fields.push('is_recurring = ?'); params.push(b.isRecurring ? 1 : 0); }
     if (b.isCogs !== undefined) { fields.push('is_cogs = ?'); params.push(b.isCogs ? 1 : 0); }
+    if (b.note !== undefined) { fields.push('note = ?'); params.push(normalizeNote(b.note)); }
     if (b.sortOrder !== undefined && b.sortOrder !== '') {
       const n = Number(b.sortOrder);
       if (!Number.isFinite(n)) { reply.code(400); return fail(400, '排序值无效'); }

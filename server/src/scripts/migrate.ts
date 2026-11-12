@@ -20,7 +20,7 @@ async function main() {
   await conn.changeUser({ database: env.mysql.database });
 
   const dir = path.resolve(process.cwd(), 'sql');
-  for (const f of ['001_schema.sql', '002_seed.sql', '004_p3_usage.sql', '005_p3_metered.sql', '006_cloudflare_billing.sql', '007_payment_imports.sql', '008_suppliers.sql', '009_ref_id_widen.sql', '010_recurring_supplier.sql', '011_unit_economics.sql', '012_products.sql', '013_project_repo.sql', '014_product_econ_variables.sql', '015_product_econ_snapshots.sql']) {
+  for (const f of ['001_schema.sql', '002_seed.sql', '004_p3_usage.sql', '005_p3_metered.sql', '006_cloudflare_billing.sql', '007_payment_imports.sql', '008_suppliers.sql', '009_ref_id_widen.sql', '010_recurring_supplier.sql', '011_unit_economics.sql', '012_products.sql', '013_project_repo.sql', '014_product_econ_variables.sql', '015_product_econ_snapshots.sql', '016_category_note.sql', '017_budget_period_once.sql', '018_cdn_tiered_pricing.sql', '019_cdn_package_pricing.sql']) {
     const file = path.join(dir, f);
     if (!fs.existsSync(file)) { console.warn(`跳过（不存在）：${f}`); continue; }
     console.log(`▶ 执行 ${f} ...`);

@@ -7,6 +7,7 @@ import {
   useGetCategoriesQuery,
   useGetProjectsQuery,
   type Budget,
+  type BudgetPeriodType,
 } from '../api';
 import { Card, CardHeader, Empty, PageHeader } from '../components/Card';
 import { Button, Field, Input, MonthInput, Select } from '../components/Field';
@@ -59,7 +60,7 @@ function UsageBar({ rate, over }: { rate: number | null; over: boolean }) {
 type FormState = {
   projectId: string;
   categoryId: string;
-  periodType: 'monthly' | 'yearly';
+  periodType: BudgetPeriodType;
   period: string;
   amountCny: string;
 };
@@ -226,7 +227,7 @@ export default function Budgets() {
                         <div className="leading-tight">
                           <div className="text-xs tabular-nums text-slate-200">{b.period}</div>
                           <div className="text-[11px] text-slate-500">
-                            {b.periodType === 'yearly' ? '年度 Yearly' : '月度 Monthly'}
+                            {b.periodType === 'yearly' ? '年度 Yearly' : b.periodType === 'once' ? '一次性 One-time' : '月度 Monthly'}
                           </div>
                         </div>
                       </td>
@@ -317,7 +318,7 @@ export default function Budgets() {
               onChange={(e) =>
                 setForm({
                   ...form,
-                  periodType: e.target.value as 'monthly' | 'yearly',
+                  periodType: e.target.value as BudgetPeriodType,
                   period:
                     e.target.value === 'yearly'
                       ? new Date().toISOString().slice(0, 4)
@@ -327,6 +328,7 @@ export default function Budgets() {
             >
               <option value="monthly">月度 Monthly</option>
               <option value="yearly">年度 Yearly</option>
+              <option value="once">一次性 One-time</option>
             </Select>
           </Field>
           <Field label={form.periodType === 'yearly' ? '年度 Year' : '月份 Month'}>

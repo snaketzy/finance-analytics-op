@@ -248,7 +248,7 @@ CREATE TABLE budgets (
   project_id  BIGINT UNSIGNED NOT NULL,
   category_id BIGINT UNSIGNED NULL,             -- NULL = 项目总预算
   period      CHAR(7) NOT NULL,                 -- 2026-03 或 2026 表示年
-  period_type ENUM('monthly','yearly') NOT NULL,
+  period_type ENUM('monthly','yearly','once') NOT NULL,  -- once = 一次性（period 仍为 YYYY-MM）
   amount_cny  DECIMAL(18,2) NOT NULL,
   UNIQUE KEY uk_budget (project_id, category_id, period)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

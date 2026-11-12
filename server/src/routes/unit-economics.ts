@@ -4,7 +4,7 @@ import { pool, type Row } from '../db';
 import { ok, fail } from '../http';
 import { latestRate } from '../lib/fx';
 import { loadProductActuals, loadProductCostBreakdown, loadProductCompositions } from '../lib/allocation';
-import { buildEconModel, type EconVars } from '../lib/econModel';
+import { buildEconModel, type EconVars, type CdnTier, type CdnPackage, type CdnPricingMode, type CdnPackagePrice } from '../lib/econModel';
 import {
   SCENARIOS,
   DEFAULT_THRESHOLDS,
@@ -187,6 +187,12 @@ const ECON_KEYS: (keyof EconVars)[] = [
   'avgTitleGb',
   'cdnTier1PerTbCny',
   'cdnTier2PerTbCny',
+  'cdnTier1Tiers',
+  'cdnTier2Tiers',
+  'cdnPricingMode',
+  'cdnPackagePrice',
+  'cdnTier1Packages',
+  'cdnTier2Packages',
   'tier1Share',
   'viewers',
   'titlesPerViewer',
@@ -205,6 +211,61 @@ const ECON_KEYS: (keyof EconVars)[] = [
 
 const toSnake = (k: string) => k.replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`);
 
+/** 解析 CDN 阶梯（兼容 JSON 字符串 / 已解析数组），无效时返回 null。 */
+function parseTiers(v: unknown): CdnTier[] | null {
+  let arr: unknown = v;
+  if (typeof v === 'string') {
+    if (!v.trim()) return null;
+    try {
+      arr = JSON.parse(v);
+    } catch {
+      return null;
+    }
+  }
+  if (!Array.isArray(arr)) return null;
+  const clean = arr
+    .map((x) => {
+      if (!x || typeof x !== 'object') return null;
+      const o = x as Record<string, unknown>;
+      const price = toNum(o.pricePerTbCny);
+      return price == null ? null : { upToTb: toNum(o.upToTb), pricePerTbCny: price };
+    })
+    .filter((x): x is CdnTier => x !== null);
+  return clean.length ? clean : null;
+}
+
+/** 解析 CDN 资源包（兼容 JSON 字符串 / 已解析数组），无效时返回 null。 */
+function parsePackages(v: unknown): CdnPackage[] | null {
+  let arr: unknown = v;
+  if (typeof v === 'string') {
+    if (!v.trim()) return null;
+    try {
+      arr = JSON.parse(v);
+    } catch {
+      return null;
+    }
+  }
+  if (!Array.isArray(arr)) return null;
+  const clean = arr
+    .map((x) => {
+      if (!x || typeof x !== 'object') return null;
+      const o = x as Record<string, unknown>;
+      const sizeGb = toNum(o.sizeGb);
+      if (sizeGb == null || sizeGb <= 0) return null;
+      return { sizeGb, listCny: toNum(o.listCny) ?? 0, renewCny: toNum(o.renewCny) ?? 0 };
+    })
+    .filter((x): x is CdnPackage => x !== null);
+  return clean.length ? clean : null;
+}
+
+/** 解析 CDN 计价模式（非法值返回 null，由计算层回落 tiered）。 */
+const parsePricingMode = (v: unknown): CdnPricingMode | null =>
+  v === 'package' || v === 'tiered' ? v : null;
+
+/** 解析资源包价格档（非法值返回 null，由计算层回落 renew）。 */
+const parsePackagePrice = (v: unknown): CdnPackagePrice | null =>
+  v === 'list' || v === 'renew' ? v : null;
+
 /** 从任意来源（数据库行 / 请求体）读取全变量，缺省字段按 null。 */
 function pickEconVars(r: Record<string, unknown>): EconVars {
   const g = (k: string) => toNum(r[k]);
@@ -218,6 +279,12 @@ function pickEconVars(r: Record<string, unknown>): EconVars {
     avgTitleGb: g('avgTitleGb'),
     cdnTier1PerTbCny: g('cdnTier1PerTbCny'),
     cdnTier2PerTbCny: g('cdnTier2PerTbCny'),
+    cdnTier1Tiers: parseTiers(r.cdnTier1Tiers),
+    cdnTier2Tiers: parseTiers(r.cdnTier2Tiers),
+    cdnPricingMode: parsePricingMode(r.cdnPricingMode),
+    cdnPackagePrice: parsePackagePrice(r.cdnPackagePrice),
+    cdnTier1Packages: parsePackages(r.cdnTier1Packages),
+    cdnTier2Packages: parsePackages(r.cdnTier2Packages),
     tier1Share: g('tier1Share'),
     viewers: g('viewers'),
     titlesPerViewer: g('titlesPerViewer'),
@@ -294,6 +361,12 @@ const emptyEconVars = (vultrMonthlyCny: number | null): EconVars => ({
   avgTitleGb: null,
   cdnTier1PerTbCny: null,
   cdnTier2PerTbCny: null,
+  cdnTier1Tiers: null,
+  cdnTier2Tiers: null,
+  cdnPricingMode: null,
+  cdnPackagePrice: null,
+  cdnTier1Packages: null,
+  cdnTier2Packages: null,
   tier1Share: null,
   viewers: null,
   titlesPerViewer: null,
@@ -491,7 +564,11 @@ export default async function (app: FastifyInstance) {
     const vars = bodyEconVars((req.body ?? {}) as Record<string, unknown>);
     const cols = ECON_KEYS.map((k) => toSnake(k));
     const placeholders = ECON_KEYS.map(() => '?').join(', ');
-    const values = ECON_KEYS.map((k) => vars[k]);
+    // 阶梯为 JSON 列，落库前需序列化（null 原样传）
+    const values = ECON_KEYS.map((k) => {
+      const val = vars[k];
+      return Array.isArray(val) ? JSON.stringify(val) : val;
+    });
 
     await pool.query<ResultSetHeader>(
       `INSERT INTO product_econ_variables (product_id, ${cols.join(', ')}, saved_at)
