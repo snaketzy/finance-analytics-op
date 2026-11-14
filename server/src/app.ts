@@ -19,6 +19,7 @@ import paymentsRoutes from './routes/payments';
 import unitEconomicsRoutes from './routes/unit-economics';
 import unitEconomicsThkcosRoutes from './routes/unit-economics-thkcos';
 import productsRoutes from './routes/products';
+import videoTrafficRoutes from './routes/video-traffic';
 
 export async function buildApp(): Promise<FastifyInstance> {
   const app = Fastify({ logger: { level: 'info' }, bodyLimit: 10 * 1024 * 1024 });
@@ -45,6 +46,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   await app.register(unitEconomicsRoutes, { prefix: '/api/unit-economics' });
   await app.register(unitEconomicsThkcosRoutes, { prefix: '/api/unit-economics' });
   await app.register(productsRoutes, { prefix: '/api/products' });
+  await app.register(videoTrafficRoutes, { prefix: '/api/video-traffic' });
 
   startRepoSyncScheduler();
 

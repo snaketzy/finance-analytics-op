@@ -906,7 +906,7 @@ export type UESaveInputsInput = {
 
 /* ------------------------- 全变量测算（econ-vars） ------------------------- */
 
-/** 全变量测算情景：悲观取单片流量上限 K、乐观取下限 J。 */
+/** 全变量测算情景：悲观取每分钟流量上限 K、乐观取下限 J。 */
 export type EconScenarioKey = 'pessimistic' | 'neutral' | 'optimistic';
 
 /**
@@ -968,14 +968,22 @@ export type EconVars = {
   cdnTier2Packages: CdnPackage[] | null;
   /** α 亚太一区流量占比 0-1 */
   tier1Share: number | null;
-  /** H 月观看人数 */
-  viewers: number | null;
-  /** I 人均月观看部数 */
-  titlesPerViewer: number | null;
-  /** J 单片流量下限 GB */
-  perTitleGbLow: number | null;
-  /** K 单片流量上限 GB */
-  perTitleGbHigh: number | null;
+  /** H1 普通用户月观看人数 */
+  regularViewers: number | null;
+  /** H2 重度用户月观看人数 */
+  heavyViewers: number | null;
+  /** I1 普通用户人均月观影分钟数 分钟 */
+  regularMinutesPerViewer: number | null;
+  /** I2 重度用户人均月观影分钟数 分钟 */
+  heavyMinutesPerViewer: number | null;
+  /** J1 普通用户每分钟流量下限 MB */
+  regularPerMinMbLow: number | null;
+  /** J2 重度用户每分钟流量下限 MB */
+  heavyPerMinMbLow: number | null;
+  /** K1 普通用户每分钟流量上限 MB */
+  regularPerMinMbHigh: number | null;
+  /** K2 重度用户每分钟流量上限 MB */
+  heavyPerMinMbHigh: number | null;
   /** L1 月卡订阅人数 */
   monthlySubs: number | null;
   /** M1 月卡 ¥/月 */
@@ -1007,7 +1015,8 @@ export type EconCostItem = {
 
 export type EconMetrics = {
   scenario: EconScenarioKey;
-  gbPerTitle: number;
+  /** 本情景采用的每分钟流量 MB。 */
+  mbPerMin: number;
   domainMonthlyCny: number;
   sslMonthlyCny: number;
   storageMonthlyCny: number;
@@ -1021,7 +1030,8 @@ export type EconMetrics = {
   netCny: number;
   netMargin: number | null;
   cdnPerViewerCny: number;
-  cdnPerTitleCny: number;
+  /** 每分钟流量的 CDN 成本。 */
+  cdnPerMinCny: number;
   perViewerRevenueCny: number | null;
   perViewerCostCny: number | null;
   breakEvenViewers: number | null;
@@ -1128,7 +1138,7 @@ export type EconSnapshotList = {
 /** 流量计价模式：direct = 直连 COS 外网下行，cdn = 经 CDN（边缘下行 + COS 回源）。 */
 export type ThkcosTrafficMode = 'direct' | 'cdn';
 
-/** 情景键：悲观取单片流量上限 K、乐观取下限 J。 */
+/** 情景键：悲观取每分钟流量上限 K、乐观取下限 J。 */
 export type ThkcosScenarioKey = 'pessimistic' | 'neutral' | 'optimistic';
 
 /** cf & THKCOS 全变量测算输入（NULL = 未填，计算时按 0 处理）。 */
@@ -1153,14 +1163,22 @@ export type ThkcosVars = {
   syncPerGbCny: number | null;
   /** 流量计价模式（空 = direct） */
   trafficMode: ThkcosTrafficMode | null;
-  /** H 月观看人数 人 */
-  viewers: number | null;
-  /** I 人均月观看部数 */
-  titlesPerViewer: number | null;
-  /** J 单片流量下限 GB */
-  perTitleGbLow: number | null;
-  /** K 单片流量上限 GB */
-  perTitleGbHigh: number | null;
+  /** H1 基础会员月观看人数 人 */
+  basicViewers: number | null;
+  /** H2 高级会员月观看人数 人 */
+  premiumViewers: number | null;
+  /** I1 基础会员人均月观影分钟数 分钟 */
+  basicMinutesPerViewer: number | null;
+  /** I2 高级会员人均月观影分钟数 分钟 */
+  premiumMinutesPerViewer: number | null;
+  /** J1 基础会员每分钟流量下限 MB */
+  basicPerMinMbLow: number | null;
+  /** J2 高级会员每分钟流量下限 MB */
+  premiumPerMinMbLow: number | null;
+  /** K1 基础会员每分钟流量上限 MB */
+  basicPerMinMbHigh: number | null;
+  /** K2 高级会员每分钟流量上限 MB */
+  premiumPerMinMbHigh: number | null;
   /** λ CDN 缓存命中率 0-1（仅 cdn 模式） */
   cacheHitRatio: number | null;
   /** 直连：COS 外网下行阶梯（固定 5 档） */
@@ -1183,18 +1201,30 @@ export type ThkcosVars = {
   eoPlanIncludedGb: number | null;
   /** EO 流量包地区抵扣系数（亚太1区 = 2.49） */
   eoDeductionRatio: number | null;
-  /** L1 月卡订阅人数 */
-  monthlySubs: number | null;
-  /** M1 月卡 ¥/月 */
-  monthlyPriceCny: number | null;
-  /** L2 季卡订阅人数 */
-  quarterlySubs: number | null;
-  /** M2 季卡 ¥/月（实收 = ×3） */
-  quarterlyPriceCny: number | null;
-  /** L3 年卡订阅人数 */
-  yearlySubs: number | null;
-  /** M3 年卡 ¥/月（实收 = ×12） */
-  yearlyPriceCny: number | null;
+  /** L1 基础会员 · 月卡订阅人数 */
+  basicMonthlySubs: number | null;
+  /** M1 基础会员 · 月卡 ¥/月 */
+  basicMonthlyPriceCny: number | null;
+  /** L2 基础会员 · 季卡订阅人数（实收 ×3） */
+  basicQuarterlySubs: number | null;
+  /** M2 基础会员 · 季卡 ¥/月（实收 = ×3） */
+  basicQuarterlyPriceCny: number | null;
+  /** L3 基础会员 · 年卡订阅人数（实收 ×12） */
+  basicYearlySubs: number | null;
+  /** M3 基础会员 · 年卡 ¥/月（实收 = ×12） */
+  basicYearlyPriceCny: number | null;
+  /** L4 高级会员 · 月卡订阅人数 */
+  premiumMonthlySubs: number | null;
+  /** M4 高级会员 · 月卡 ¥/月 */
+  premiumMonthlyPriceCny: number | null;
+  /** L5 高级会员 · 季卡订阅人数（实收 ×3） */
+  premiumQuarterlySubs: number | null;
+  /** M5 高级会员 · 季卡 ¥/月（实收 = ×3） */
+  premiumQuarterlyPriceCny: number | null;
+  /** L6 高级会员 · 年卡订阅人数（实收 ×12） */
+  premiumYearlySubs: number | null;
+  /** M6 高级会员 · 年卡 ¥/月（实收 = ×12） */
+  premiumYearlyPriceCny: number | null;
   /** 观看人数月净增长率 0-1 */
   viewerGrowth: number | null;
   /** 订阅人数月净增长率 0-1 */
@@ -1214,7 +1244,8 @@ export type ThkcosCostItem = {
 
 export type ThkcosMetrics = {
   scenario: ThkcosScenarioKey;
-  gbPerTitle: number;
+  /** 本情景采用的每分钟流量 MB。 */
+  mbPerMin: number;
   domainMonthlyCny: number;
   sslMonthlyCny: number;
   r2StorageMonthlyCny: number;
@@ -1231,7 +1262,8 @@ export type ThkcosMetrics = {
   netCny: number;
   netMargin: number | null;
   trafficPerViewerCny: number;
-  trafficPerTitleCny: number;
+  /** 每分钟流量的流量成本。 */
+  trafficPerMinCny: number;
   perViewerRevenueCny: number | null;
   perViewerCostCny: number | null;
   breakEvenViewers: number | null;
@@ -1311,7 +1343,7 @@ export type ThkcosSnapshot = {
   costCny: number;
   netCny: number;
   viewers: number | null;
-  monthlySubs: number | null;
+  subscribers: number | null;
 };
 
 export type ThkcosSnapshotList = {
@@ -1469,6 +1501,26 @@ export type PaymentImportInput = {
     feeCategoryId?: number | null;
     accountId?: number | null;
   }[];
+};
+
+/* ------------------------------------------------------------------ */
+/* 视频流量测算（全局共用）                                             */
+/* ------------------------------------------------------------------ */
+
+export type VideoTrafficRow = {
+  /** 编码：HEVC / H264（仅 HEVC 有 4K 档）。 */
+  codec: string;
+  /** 分辨率档位：4K / 1080P / 720P / 480P / 360P */
+  resolution: string;
+  sizeGb: number | null;
+  durationMin: number | null;
+  /** 每分钟流量 GB/min（= 体积 / 时长，服务端折算）。 */
+  perMinGb: number | null;
+};
+
+export type VideoTrafficList = {
+  items: VideoTrafficRow[];
+  updatedAt: string | null;
 };
 
 /* ------------------------------------------------------------------ */
@@ -2084,6 +2136,23 @@ export const api = createApi({
       }),
       invalidatesTags: ['UnitEconomics'],
     }),
+
+    /* ------------------- 视频流量测算（video-traffic，全局共用） ------------------- */
+
+    /** 读取 5 档分辨率流量测算。 */
+    getVideoTraffic: builder.query<VideoTrafficList, void>({
+      query: () => '/video-traffic',
+      providesTags: ['UnitEconomics'],
+    }),
+
+    /** 保存各编码 × 分辨率流量测算（按 codec + resolution upsert）。 */
+    saveVideoTraffic: builder.mutation<
+      VideoTrafficList,
+      { items: { codec: string; resolution: string; sizeGb: number | null; durationMin: number | null }[] }
+    >({
+      query: (body) => ({ url: '/video-traffic', method: 'PUT', body }),
+      invalidatesTags: ['UnitEconomics'],
+    }),
   }),
 });
 
@@ -2174,4 +2243,6 @@ export const {
   useGetUnitEconomicsThkcosVarsSnapshotsQuery,
   useLazyGetUnitEconomicsThkcosVarsSnapshotQuery,
   useDeleteUnitEconomicsThkcosVarsSnapshotMutation,
+  useGetVideoTrafficQuery,
+  useSaveVideoTrafficMutation,
 } = api;

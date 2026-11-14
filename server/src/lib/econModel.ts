@@ -63,14 +63,22 @@ export type EconVars = {
   cdnTier2Packages: CdnPackage[] | null;
   /** α 亚太一区流量占比 0-1 */
   tier1Share: number | null;
-  /** H 月观看人数 人 */
-  viewers: number | null;
-  /** I 人均月观看部数 */
-  titlesPerViewer: number | null;
-  /** J 单片流量下限 GB */
-  perTitleGbLow: number | null;
-  /** K 单片流量上限 GB */
-  perTitleGbHigh: number | null;
+  /** H1 普通用户月观看人数 人 */
+  regularViewers: number | null;
+  /** H2 重度用户月观看人数 人 */
+  heavyViewers: number | null;
+  /** I1 普通用户人均月观影分钟数 分钟 */
+  regularMinutesPerViewer: number | null;
+  /** I2 重度用户人均月观影分钟数 分钟 */
+  heavyMinutesPerViewer: number | null;
+  /** J1 普通用户每分钟流量下限 MB */
+  regularPerMinMbLow: number | null;
+  /** J2 重度用户每分钟流量下限 MB */
+  heavyPerMinMbLow: number | null;
+  /** K1 普通用户每分钟流量上限 MB */
+  regularPerMinMbHigh: number | null;
+  /** K2 重度用户每分钟流量上限 MB */
+  heavyPerMinMbHigh: number | null;
   /** L1 月卡订阅人数 */
   monthlySubs: number | null;
   /** M1 月卡 ¥/月 */
@@ -94,14 +102,14 @@ export type EconVars = {
 export type EconScenarioKey = 'pessimistic' | 'neutral' | 'optimistic';
 export const ECON_SCENARIOS: EconScenarioKey[] = ['pessimistic', 'neutral', 'optimistic'];
 
-/** 三档情景的口径：悲观取单片流量上限、乐观取下限。 */
+/** 三档情景的口径：悲观取每分钟流量上限、乐观取下限。 */
 export const ECON_SCENARIO_LABEL: Record<
   EconScenarioKey,
   { cn: string; en: string; stroke: string; note: string }
 > = {
-  pessimistic: { cn: '悲观', en: 'Pessimistic', stroke: '#fb7185', note: '单片流量取 K 上限' },
-  neutral: { cn: '中性', en: 'Neutral', stroke: '#38bdf8', note: '单片流量取 (J+K)/2' },
-  optimistic: { cn: '乐观', en: 'Optimistic', stroke: '#34d399', note: '单片流量取 J 下限' },
+  pessimistic: { cn: '悲观', en: 'Pessimistic', stroke: '#fb7185', note: '每分钟流量取 K 上限' },
+  neutral: { cn: '中性', en: 'Neutral', stroke: '#38bdf8', note: '每分钟流量取 (J+K)/2' },
+  optimistic: { cn: '乐观', en: 'Optimistic', stroke: '#34d399', note: '每分钟流量取 J 下限' },
 };
 
 const r2 = (n: number) => Math.round(n * 100) / 100;
@@ -125,6 +133,8 @@ type Numeric = {
 
 /** 腾讯云 CDN 计费进制：1TB = 1000GB（非 1024）。 */
 export const GB_PER_TB = 1000;
+/** MB → GB 换算：1GB = 1024MB（与「视频流量测算」口径一致）。 */
+export const MB_PER_GB = 1024;
 
 /** 归一化阶梯数组：过滤无效档位，空数组视为「未启用阶梯」。 */
 function normalizeTiers(t: CdnTier[] | null | undefined): CdnTier[] | null {
@@ -235,10 +245,14 @@ function resolve(vars: EconVars): Numeric {
     cdnTier1Packages: normalizePackages(vars.cdnTier1Packages),
     cdnTier2Packages: normalizePackages(vars.cdnTier2Packages),
     tier1Share: vars.tier1Share == null ? 1 : Math.min(1, Math.max(0, num(vars.tier1Share))),
-    viewers: num(vars.viewers),
-    titlesPerViewer: num(vars.titlesPerViewer),
-    perTitleGbLow: num(vars.perTitleGbLow),
-    perTitleGbHigh: num(vars.perTitleGbHigh),
+    regularViewers: num(vars.regularViewers),
+    heavyViewers: num(vars.heavyViewers),
+    regularMinutesPerViewer: num(vars.regularMinutesPerViewer),
+    heavyMinutesPerViewer: num(vars.heavyMinutesPerViewer),
+    regularPerMinMbLow: num(vars.regularPerMinMbLow),
+    heavyPerMinMbLow: num(vars.heavyPerMinMbLow),
+    regularPerMinMbHigh: num(vars.regularPerMinMbHigh),
+    heavyPerMinMbHigh: num(vars.heavyPerMinMbHigh),
     monthlySubs: num(vars.monthlySubs),
     monthlyPriceCny: num(vars.monthlyPriceCny),
     quarterlySubs: num(vars.quarterlySubs),
@@ -251,19 +265,19 @@ function resolve(vars: EconVars): Numeric {
   };
 }
 
-/** 单片流量区间（未填一侧时以另一侧兜底）。 */
-function gbRange(v: Numeric): { low: number; high: number } {
-  const j = v.perTitleGbLow > 0 ? v.perTitleGbLow : v.perTitleGbHigh;
-  const k = v.perTitleGbHigh > 0 ? v.perTitleGbHigh : v.perTitleGbLow;
+/** 某组的每分钟流量区间（未填一侧时以另一侧兜底）。 */
+function mbRangeOf(low: number, high: number): { low: number; high: number } {
+  const j = low > 0 ? low : high;
+  const k = high > 0 ? high : low;
   return j <= k ? { low: j, high: k } : { low: k, high: j };
 }
 
-/** 某情景下的单片流量取值。 */
-function gbForScenario(v: Numeric, scenario: EconScenarioKey): number {
-  const { low, high } = gbRange(v);
-  if (scenario === 'optimistic') return low;
-  if (scenario === 'pessimistic') return high;
-  return (low + high) / 2;
+/** 某组在某情景下的每分钟流量取值（MB）。 */
+function mbForGroup(low: number, high: number, scenario: EconScenarioKey): number {
+  const { low: lo, high: hi } = mbRangeOf(low, high);
+  if (scenario === 'optimistic') return lo;
+  if (scenario === 'pessimistic') return hi;
+  return (lo + hi) / 2;
 }
 
 /* ------------------------------------------------------------------ */
@@ -282,8 +296,8 @@ export type EconCostItem = {
 
 export type EconMetrics = {
   scenario: EconScenarioKey;
-  /** 本情景采用的单片流量（GB）。 */
-  gbPerTitle: number;
+  /** 本情景采用的每分钟流量（MB）。 */
+  mbPerMin: number;
   domainMonthlyCny: number;
   sslMonthlyCny: number;
   storageMonthlyCny: number;
@@ -300,8 +314,8 @@ export type EconMetrics = {
   netMargin: number | null;
   /** 每观看人次的 CDN 边际成本。 */
   cdnPerViewerCny: number;
-  /** 每部影片的流量成本。 */
-  cdnPerTitleCny: number;
+  /** 每分钟流量的 CDN 成本。 */
+  cdnPerMinCny: number;
   perViewerRevenueCny: number | null;
   perViewerCostCny: number | null;
   /** 盈亏平衡观看人数；null = 结构上不可达或与人数无关。 */
@@ -318,7 +332,7 @@ export type EconMetrics = {
 /**
  * 单月稳态测算：
  *   存储 = D·E·B；基座固定 = A + 域名/12 + SSL/12 + C + 存储
- *   流量TB = H·I·单片GB / 1000，按 α 拆分为一区 / 二区流量
+ *   流量TB = H·I·每分钟MB / (1024×1000)，按 α 拆分为一区 / 二区流量
  *   CDN：tiered 模式 = 累进(一区流量, 一区阶梯) + 累进(二区流量, 二区阶梯)
  *        （阶梯缺失时按 F / G 单档全量计价）
  *        package 模式 = 资源包最优覆盖(一区流量) + 资源包最优覆盖(二区流量)
@@ -326,7 +340,8 @@ export type EconMetrics = {
  */
 export function computeEcon(vars: EconVars, scenario: EconScenarioKey): EconMetrics {
   const v = resolve(vars);
-  const gbPerTitle = gbForScenario(v, scenario);
+  const regMb = mbForGroup(v.regularPerMinMbLow, v.regularPerMinMbHigh, scenario);
+  const hvMb = mbForGroup(v.heavyPerMinMbLow, v.heavyPerMinMbHigh, scenario);
 
   const domainMonthlyCny = v.domainAnnualCny / 12;
   const sslMonthlyCny = v.sslAnnualCny / 12;
@@ -334,7 +349,15 @@ export function computeEcon(vars: EconVars, scenario: EconScenarioKey): EconMetr
   const baseFixedCny =
     v.vultrMonthlyCny + domainMonthlyCny + sslMonthlyCny + v.r2ClassAMonthlyCny + storageMonthlyCny;
 
-  const trafficGb = v.viewers * v.titlesPerViewer * gbPerTitle;
+  // 普通 + 重度两组各自：人数 × 人均分钟 × 每分钟 MB，求和得总 MB → GB → TB
+  const totalViewers = v.regularViewers + v.heavyViewers;
+  const totalMinutes =
+    v.regularViewers * v.regularMinutesPerViewer + v.heavyViewers * v.heavyMinutesPerViewer;
+  const trafficMb =
+    v.regularViewers * v.regularMinutesPerViewer * regMb +
+    v.heavyViewers * v.heavyMinutesPerViewer * hvMb;
+  const mbPerMin = totalMinutes > 0 ? trafficMb / totalMinutes : 0;
+  const trafficGb = trafficMb / MB_PER_GB;
   const trafficTb = trafficGb / GB_PER_TB;
   const tier1Tb = trafficTb * v.tier1Share;
   const tier2Tb = trafficTb * (1 - v.tier1Share);
@@ -354,8 +377,9 @@ export function computeEcon(vars: EconVars, scenario: EconScenarioKey): EconMetr
   const revenueCny = v.monthlySubs * v.monthlyPriceCny + v.quarterlySubs * v.quarterlyPriceCny + v.yearlySubs * v.yearlyPriceCny;
   const netCny = revenueCny - totalCostCny;
 
-  const cdnPerTitleCny = (gbPerTitle / GB_PER_TB) * blendedPerTbCny;
-  const cdnPerViewerCny = v.titlesPerViewer * cdnPerTitleCny;
+  // 按总分钟 / 总人数摊薄（两组口径加权平均）
+  const cdnPerMinCny = totalMinutes > 0 ? cdnCny / totalMinutes : 0;
+  const cdnPerViewerCny = totalViewers > 0 ? cdnCny / totalViewers : 0;
 
   // 收入不随观看人数变化，故固定成本已高于收入时，增加人数只会放大亏损。
   const breakEvenViewersRaw =
@@ -369,10 +393,10 @@ export function computeEcon(vars: EconVars, scenario: EconScenarioKey): EconMetr
       : null;
   const breakEvenTitles = breakEvenTitlesRaw != null && breakEvenTitlesRaw > 0 ? r2(breakEvenTitlesRaw) : null;
 
-  const perViewerRevenueCny = v.viewers > 0 ? revenueCny / v.viewers : null;
-  const perViewerCostCny = v.viewers > 0 ? totalCostCny / v.viewers : null;
+  const perViewerRevenueCny = totalViewers > 0 ? revenueCny / totalViewers : null;
+  const perViewerCostCny = totalViewers > 0 ? totalCostCny / totalViewers : null;
   const safetyMargin =
-    breakEvenViewers != null && v.viewers > 0 ? r4((v.viewers - breakEvenViewers) / v.viewers) : null;
+    breakEvenViewers != null && totalViewers > 0 ? r4((totalViewers - breakEvenViewers) / totalViewers) : null;
 
   const rawCosts: Omit<EconCostItem, 'share'>[] = [
     { key: 'vultr', labelCn: 'Vultr 云主机', labelEn: 'Vultr Host', cny: v.vultrMonthlyCny, group: 'fixed' },
@@ -387,7 +411,7 @@ export function computeEcon(vars: EconVars, scenario: EconScenarioKey): EconMetr
 
   return {
     scenario,
-    gbPerTitle: r2(gbPerTitle),
+    mbPerMin: r2(mbPerMin),
     domainMonthlyCny: r2(domainMonthlyCny),
     sslMonthlyCny: r2(sslMonthlyCny),
     storageMonthlyCny: r2(storageMonthlyCny),
@@ -401,7 +425,7 @@ export function computeEcon(vars: EconVars, scenario: EconScenarioKey): EconMetr
     netCny: r2(netCny),
     netMargin: revenueCny > 0 ? r4(netCny / revenueCny) : null,
     cdnPerViewerCny: r4(cdnPerViewerCny),
-    cdnPerTitleCny: r4(cdnPerTitleCny),
+    cdnPerMinCny: r4(cdnPerMinCny),
     perViewerRevenueCny: perViewerRevenueCny == null ? null : r2(perViewerRevenueCny),
     perViewerCostCny: perViewerCostCny == null ? null : r2(perViewerCostCny),
     breakEvenViewers,
@@ -437,9 +461,10 @@ export type EconCurve = {
 export function econCurve(vars: EconVars, scenario: EconScenarioKey, samples = 24): EconCurve {
   const v = resolve(vars);
   const m = computeEcon(vars, scenario);
+  const totalViewers = v.regularViewers + v.heavyViewers;
   const span = Math.max(
     m.breakEvenViewers != null ? m.breakEvenViewers * 1.8 : 0,
-    v.viewers * 1.5,
+    totalViewers * 1.5,
     100
   );
   const maxViewers = Math.ceil(span / 50) * 50;
@@ -459,7 +484,7 @@ export function econCurve(vars: EconVars, scenario: EconScenarioKey, samples = 2
     scenario,
     points,
     maxViewers,
-    currentViewers: r2(v.viewers),
+    currentViewers: r2(totalViewers),
     breakEvenViewers: m.breakEvenViewers,
   };
 }
@@ -493,6 +518,7 @@ export function projectEcon(vars: EconVars, scenario: EconScenarioKey, fromYm: s
   const v = resolve(vars);
   const m = computeEcon(vars, scenario);
   const subs = v.monthlySubs + v.quarterlySubs + v.yearlySubs;
+  const totalViewers = v.regularViewers + v.heavyViewers;
 
   const points: EconProjectionPoint[] = [];
   let cum = 0;
@@ -500,7 +526,7 @@ export function projectEcon(vars: EconVars, scenario: EconScenarioKey, fromYm: s
   let paybackMonth: number | null = null;
 
   for (let i = 0; i <= v.horizonMonths; i++) {
-    const viewers = v.viewers * Math.pow(1 + v.viewerGrowth, i);
+    const viewers = totalViewers * Math.pow(1 + v.viewerGrowth, i);
     const subsI = subs * Math.pow(1 + v.subscriberGrowth, i);
     const revenueCny = v.subscriberGrowth === 0 ? m.revenueCny : m.revenueCny * Math.pow(1 + v.subscriberGrowth, i);
     const totalCostCny = m.baseFixedCny + viewers * m.cdnPerViewerCny;
@@ -546,8 +572,12 @@ export type EconSensitivityRow = {
 type PerturbTarget = { key: string; labelCn: string; labelEn: string; fields: (keyof EconVars)[] };
 
 const PERTURB_TARGETS: PerturbTarget[] = [
-  { key: 'perTitleGb', labelCn: '单片流量 J~K', labelEn: 'GB / Title', fields: ['perTitleGbLow', 'perTitleGbHigh'] },
-  { key: 'titlesPerViewer', labelCn: '人均月观影部数', labelEn: 'Titles / Viewer', fields: ['titlesPerViewer'] },
+  { key: 'regPerMinMb', labelCn: '普通用户每分钟流量 J1~K1', labelEn: 'Reg MB/Min', fields: ['regularPerMinMbLow', 'regularPerMinMbHigh'] },
+  { key: 'hvPerMinMb', labelCn: '重度用户每分钟流量 J2~K2', labelEn: 'Heavy MB/Min', fields: ['heavyPerMinMbLow', 'heavyPerMinMbHigh'] },
+  { key: 'regMinutes', labelCn: '普通用户人均月观影分钟数', labelEn: 'Reg Min/Viewer', fields: ['regularMinutesPerViewer'] },
+  { key: 'hvMinutes', labelCn: '重度用户人均月观影分钟数', labelEn: 'Heavy Min/Viewer', fields: ['heavyMinutesPerViewer'] },
+  { key: 'regViewers', labelCn: '普通用户人数 H1', labelEn: 'Reg Viewers', fields: ['regularViewers'] },
+  { key: 'hvViewers', labelCn: '重度用户人数 H2', labelEn: 'Heavy Viewers', fields: ['heavyViewers'] },
   { key: 'cdnTier1', labelCn: '亚太一区单价 F', labelEn: 'APAC-1 ¥/TB', fields: ['cdnTier1PerTbCny', 'cdnTier1Tiers', 'cdnTier1Packages'] },
   { key: 'cdnTier2', labelCn: '亚太二区单价 G', labelEn: 'APAC-2 ¥/TB', fields: ['cdnTier2PerTbCny', 'cdnTier2Tiers', 'cdnTier2Packages'] },
   { key: 'tier1Share', labelCn: '亚太一区占比 α', labelEn: 'APAC-1 Share', fields: ['tier1Share'] },
@@ -638,14 +668,25 @@ export type EconModel = {
 export function econWarnings(vars: EconVars): string[] {
   const v = resolve(vars);
   const out: string[] = [];
-  if (v.monthlySubs + v.quarterlySubs + v.yearlySubs === 0) out.push('未填订阅人数，月收入为 0。');
+  const subs = v.monthlySubs + v.quarterlySubs + v.yearlySubs;
+  const totalViewers = v.regularViewers + v.heavyViewers;
+  if (subs === 0) out.push('未填订阅人数，月收入为 0。');
   if (v.monthlyPriceCny + v.quarterlyPriceCny + v.yearlyPriceCny === 0) out.push('未填订阅单价，月收入为 0。');
   if (v.libraryTitles === 0 || v.avgTitleGb === 0 || v.r2StoragePerGbCny === 0) {
     out.push('片库数量、单片体积或存储单价为空，R2 存储成本按 0 计。');
   }
-  if (v.viewers === 0 || v.titlesPerViewer === 0) out.push('观看人数或人均观影部数为空，CDN 流量成本按 0 计。');
-  if (v.perTitleGbLow > 0 && v.perTitleGbHigh > 0 && v.perTitleGbLow > v.perTitleGbHigh) {
-    out.push('单片流量下限 J 大于上限 K，已自动交换后计算。');
+  if (totalViewers === 0) out.push('普通/重度用户人数为空，CDN 流量成本按 0 计。');
+  if (totalViewers > 0 && (v.regularMinutesPerViewer + v.heavyMinutesPerViewer === 0)) {
+    out.push('人均观影分钟数为空，CDN 流量成本按 0 计。');
+  }
+  if (v.regularPerMinMbLow > 0 && v.regularPerMinMbHigh > 0 && v.regularPerMinMbLow > v.regularPerMinMbHigh) {
+    out.push('普通用户每分钟流量下限 J1 大于上限 K1，已自动交换后计算。');
+  }
+  if (v.heavyPerMinMbLow > 0 && v.heavyPerMinMbHigh > 0 && v.heavyPerMinMbLow > v.heavyPerMinMbHigh) {
+    out.push('重度用户每分钟流量下限 J2 大于上限 K2，已自动交换后计算。');
+  }
+  if (totalViewers > subs && subs > 0) {
+    out.push(`普通+重度用户人数（${totalViewers}）超过订阅总人数（${subs}），请核对。`);
   }
   if (v.tier1Share === 1 && (v.cdnTier2PerTbCny > 0 || (v.cdnTier2Tiers?.length ?? 0) > 0)) {
     out.push('亚太一区占比 α = 100%，亚太二区单价未参与计费。');

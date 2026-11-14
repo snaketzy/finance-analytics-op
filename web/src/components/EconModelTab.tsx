@@ -59,10 +59,14 @@ type Draft = {
   cdnTier2ListPrices: string[];
   cdnTier2RenewPrices: string[];
   tier1SharePct: string;
-  viewers: string;
-  titlesPerViewer: string;
-  perTitleGbLow: string;
-  perTitleGbHigh: string;
+  regularViewers: string;
+  heavyViewers: string;
+  regularMinutesPerViewer: string;
+  heavyMinutesPerViewer: string;
+  regularPerMinMbLow: string;
+  heavyPerMinMbLow: string;
+  regularPerMinMbHigh: string;
+  heavyPerMinMbHigh: string;
   monthlySubs: string;
   monthlyPriceCny: string;
   quarterlySubs: string;
@@ -177,10 +181,14 @@ function toDraft(v: EconVars): Draft {
     cdnTier2ListPrices: packagesToPrices(v.cdnTier2Packages, 'listCny'),
     cdnTier2RenewPrices: packagesToPrices(v.cdnTier2Packages, 'renewCny'),
     tier1SharePct: pctStr(v.tier1Share),
-    viewers: numStr(v.viewers),
-    titlesPerViewer: numStr(v.titlesPerViewer),
-    perTitleGbLow: numStr(v.perTitleGbLow),
-    perTitleGbHigh: numStr(v.perTitleGbHigh),
+    regularViewers: numStr(v.regularViewers),
+    heavyViewers: numStr(v.heavyViewers),
+    regularMinutesPerViewer: numStr(v.regularMinutesPerViewer),
+    heavyMinutesPerViewer: numStr(v.heavyMinutesPerViewer),
+    regularPerMinMbLow: numStr(v.regularPerMinMbLow),
+    heavyPerMinMbLow: numStr(v.heavyPerMinMbLow),
+    regularPerMinMbHigh: numStr(v.regularPerMinMbHigh),
+    heavyPerMinMbHigh: numStr(v.heavyPerMinMbHigh),
     monthlySubs: numStr(v.monthlySubs),
     monthlyPriceCny: numStr(v.monthlyPriceCny),
     quarterlySubs: numStr(v.quarterlySubs),
@@ -217,10 +225,14 @@ function draftToVars(d: Draft): EconVars {
     cdnTier1Packages: pkg1,
     cdnTier2Packages: pkg2,
     tier1Share: parsePct(d.tier1SharePct),
-    viewers: parseNum(d.viewers),
-    titlesPerViewer: parseNum(d.titlesPerViewer),
-    perTitleGbLow: parseNum(d.perTitleGbLow),
-    perTitleGbHigh: parseNum(d.perTitleGbHigh),
+    regularViewers: parseNum(d.regularViewers),
+    heavyViewers: parseNum(d.heavyViewers),
+    regularMinutesPerViewer: parseNum(d.regularMinutesPerViewer),
+    heavyMinutesPerViewer: parseNum(d.heavyMinutesPerViewer),
+    regularPerMinMbLow: parseNum(d.regularPerMinMbLow),
+    heavyPerMinMbLow: parseNum(d.heavyPerMinMbLow),
+    regularPerMinMbHigh: parseNum(d.regularPerMinMbHigh),
+    heavyPerMinMbHigh: parseNum(d.heavyPerMinMbHigh),
     monthlySubs: parseNum(d.monthlySubs),
     monthlyPriceCny: parseNum(d.monthlyPriceCny),
     quarterlySubs: parseNum(d.quarterlySubs),
@@ -250,10 +262,14 @@ const EMPTY_VARS: EconVars = {
   cdnTier1Packages: null,
   cdnTier2Packages: null,
   tier1Share: null,
-  viewers: null,
-  titlesPerViewer: null,
-  perTitleGbLow: null,
-  perTitleGbHigh: null,
+  regularViewers: null,
+  heavyViewers: null,
+  regularMinutesPerViewer: null,
+  heavyMinutesPerViewer: null,
+  regularPerMinMbLow: null,
+  heavyPerMinMbLow: null,
+  regularPerMinMbHigh: null,
+  heavyPerMinMbHigh: null,
   monthlySubs: null,
   monthlyPriceCny: null,
   quarterlySubs: null,
@@ -305,10 +321,14 @@ const GROUPS: { cn: string; en: string; fields: FieldDef[] }[] = [
     en: 'CDN Traffic',
     fields: [
       { key: 'tier1SharePct', label: 'α · 亚太一区占比', hint: '余下走二区', unit: '%', step: '0.1', placeholder: '如 80' },
-      { key: 'viewers', label: 'H · 月观看人数', hint: 'Viewers', unit: '人', placeholder: '如 5000' },
-      { key: 'titlesPerViewer', label: 'I · 人均月观影', hint: 'Titles / Viewer', unit: '部', step: '0.1', placeholder: '如 8' },
-      { key: 'perTitleGbLow', label: 'J · 单片流量下限', hint: 'Pessimistic/Optimistic 分界', unit: 'GB', step: '0.1', placeholder: '如 1.5' },
-      { key: 'perTitleGbHigh', label: 'K · 单片流量上限', hint: '悲观取 K · 乐观取 J', unit: 'GB', step: '0.1', placeholder: '如 4' },
+      { key: 'regularViewers', label: 'H1 · 普通用户月观看人数', hint: 'Regular Viewers', unit: '人', placeholder: '如 4000' },
+      { key: 'regularMinutesPerViewer', label: 'I1 · 普通用户人均月观影', hint: 'Min / Viewer', unit: '分钟', step: '1', placeholder: '如 480' },
+      { key: 'regularPerMinMbLow', label: 'J1 · 普通用户每分钟流量下限', hint: '乐观取下限', unit: 'MB', step: '0.1', placeholder: '如 10' },
+      { key: 'regularPerMinMbHigh', label: 'K1 · 普通用户每分钟流量上限', hint: '悲观取上限', unit: 'MB', step: '0.1', placeholder: '如 20' },
+      { key: 'heavyViewers', label: 'H2 · 重度用户月观看人数', hint: 'Heavy Viewers', unit: '人', placeholder: '如 1000' },
+      { key: 'heavyMinutesPerViewer', label: 'I2 · 重度用户人均月观影', hint: 'Min / Viewer', unit: '分钟', step: '1', placeholder: '如 1800' },
+      { key: 'heavyPerMinMbLow', label: 'J2 · 重度用户每分钟流量下限', hint: '乐观取下限', unit: 'MB', step: '0.1', placeholder: '如 14' },
+      { key: 'heavyPerMinMbHigh', label: 'K2 · 重度用户每分钟流量上限', hint: '悲观取上限', unit: 'MB', step: '0.1', placeholder: '如 25' },
     ],
   },
   {
@@ -340,8 +360,8 @@ const fmtQty = (v: number) =>
 /** 统一展示保存日期（后端返回本地时间字符串 YYYY-MM-DD HH:MM:SS）。 */
 const fmtSavedAt = (v: string | null) => (v ? v.slice(0, 16) : '—');
 
-/** 单片流量区间（未填一侧时以另一侧兜底，保证 low ≤ high）。 */
-function gbRange(low: number | null, high: number | null): { low: number; high: number } {
+/** 每分钟流量区间（未填一侧时以另一侧兜底，保证 low ≤ high）。 */
+function mbRange(low: number | null, high: number | null): { low: number; high: number } {
   const j = low != null && low > 0 ? low : high ?? 0;
   const k = high != null && high > 0 ? high : low ?? 0;
   return j <= k ? { low: j, high: k } : { low: k, high: j };
@@ -622,11 +642,13 @@ export default function EconModelTab({ productId, fxRate }: { productId: number;
   if (isLoading && !model) return <Empty text="加载全变量测算…" />;
   if (!model || !neutral) return <Empty text="暂无变量数据" />;
 
-  // CDN 消耗流量区间：H × I × 单片流量（上限取 K、下限取 J）÷ 1000 换算 TB
-  const gb = gbRange(vars.perTitleGbLow, vars.perTitleGbHigh);
-  const trafficBase = (vars.viewers ?? 0) * (vars.titlesPerViewer ?? 0);
-  const trafficLowTb = (trafficBase * gb.low) / 1000;
-  const trafficHighTb = (trafficBase * gb.high) / 1000;
+  // CDN 消耗流量区间：普通 + 重度两组各自 人数 × 人均分钟 × 每分钟MB（上限取 K、下限取 J），求和后 ÷ (1024×1000) 换算 TB
+  const regMb = mbRange(vars.regularPerMinMbLow, vars.regularPerMinMbHigh);
+  const hvMb = mbRange(vars.heavyPerMinMbLow, vars.heavyPerMinMbHigh);
+  const regBase = (vars.regularViewers ?? 0) * (vars.regularMinutesPerViewer ?? 0);
+  const hvBase = (vars.heavyViewers ?? 0) * (vars.heavyMinutesPerViewer ?? 0);
+  const trafficLowTb = (regBase * regMb.low + hvBase * hvMb.low) / (1024 * 1000);
+  const trafficHighTb = (regBase * regMb.high + hvBase * hvMb.high) / (1024 * 1000);
 
   const curves = SCEN.map((s) => model.curves[s.key]);
   const sharedMaxX = Math.max(...curves.map((c) => c.maxViewers), 1);
@@ -767,7 +789,7 @@ export default function EconModelTab({ productId, fxRate }: { productId: number;
           <div className="mt-0.5 text-[11px] text-slate-500">
             {neutral.negativeUnitEconomics
               ? '单位经济为负：人均收入 < 流量成本'
-              : `当前 ${formatInt(vars.viewers ?? 0)} 人 · 安全边际 ${
+              : `当前 ${formatInt((vars.regularViewers ?? 0) + (vars.heavyViewers ?? 0))} 人 · 安全边际 ${
                   neutral.safetyMargin == null ? '—' : `${formatRate(neutral.safetyMargin * 100, 0)}%`
                 }`}
           </div>
@@ -1032,7 +1054,7 @@ export default function EconModelTab({ productId, fxRate }: { productId: number;
                     {s.en} {s.cn}
                   </div>
                   <div className="text-slate-400">
-                    单片流量：<span className="text-slate-200">{m.gbPerTitle} GB</span>
+                    每分钟流量：<span className="text-slate-200">{m.mbPerMin} MB</span>
                   </div>
                   <div className="text-slate-400">
                     平衡人数：

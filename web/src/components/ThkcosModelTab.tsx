@@ -48,10 +48,14 @@ type Draft = {
   syncGbPerMonth: string;
   syncPerGbCny: string;
   trafficMode: ThkcosTrafficMode;
-  viewers: string;
-  titlesPerViewer: string;
-  perTitleGbLow: string;
-  perTitleGbHigh: string;
+  basicViewers: string;
+  premiumViewers: string;
+  basicMinutesPerViewer: string;
+  premiumMinutesPerViewer: string;
+  basicPerMinMbLow: string;
+  premiumPerMinMbLow: string;
+  basicPerMinMbHigh: string;
+  premiumPerMinMbHigh: string;
   cacheHitRatioPct: string;
   /** 固定 5 档单价（字符串，与 TRAFFIC_TIER_BOUNDS 一一对应） */
   cosDownPrices: string[];
@@ -72,12 +76,18 @@ type Draft = {
   eoPlanIncludedGb: string;
   /** EO 流量包地区抵扣系数（亚太1区 = 2.49） */
   eoDeductionRatio: string;
-  monthlySubs: string;
-  monthlyPriceCny: string;
-  quarterlySubs: string;
-  quarterlyPriceCny: string;
-  yearlySubs: string;
-  yearlyPriceCny: string;
+  basicMonthlySubs: string;
+  basicMonthlyPriceCny: string;
+  basicQuarterlySubs: string;
+  basicQuarterlyPriceCny: string;
+  basicYearlySubs: string;
+  basicYearlyPriceCny: string;
+  premiumMonthlySubs: string;
+  premiumMonthlyPriceCny: string;
+  premiumQuarterlySubs: string;
+  premiumQuarterlyPriceCny: string;
+  premiumYearlySubs: string;
+  premiumYearlyPriceCny: string;
   viewerGrowthPct: string;
   subscriberGrowthPct: string;
   horizonMonths: string;
@@ -160,10 +170,14 @@ function toDraft(v: ThkcosVars): Draft {
     syncGbPerMonth: numStr(v.syncGbPerMonth),
     syncPerGbCny: numStr(v.syncPerGbCny),
     trafficMode: v.trafficMode ?? 'direct',
-    viewers: numStr(v.viewers),
-    titlesPerViewer: numStr(v.titlesPerViewer),
-    perTitleGbLow: numStr(v.perTitleGbLow),
-    perTitleGbHigh: numStr(v.perTitleGbHigh),
+    basicViewers: numStr(v.basicViewers),
+    premiumViewers: numStr(v.premiumViewers),
+    basicMinutesPerViewer: numStr(v.basicMinutesPerViewer),
+    premiumMinutesPerViewer: numStr(v.premiumMinutesPerViewer),
+    basicPerMinMbLow: numStr(v.basicPerMinMbLow),
+    premiumPerMinMbLow: numStr(v.premiumPerMinMbLow),
+    basicPerMinMbHigh: numStr(v.basicPerMinMbHigh),
+    premiumPerMinMbHigh: numStr(v.premiumPerMinMbHigh),
     cacheHitRatioPct: pctStr(v.cacheHitRatio),
     cosDownPrices: tiersToPrices(v.cosDownTiers),
     eoOveragePrices: tiersToPrices(v.eoOverageTiers),
@@ -177,12 +191,18 @@ function toDraft(v: ThkcosVars): Draft {
     eoPlanMonthlyCny: numStr(v.eoPlanMonthlyCny),
     eoPlanIncludedGb: numStr(v.eoPlanIncludedGb),
     eoDeductionRatio: numStr(v.eoDeductionRatio),
-    monthlySubs: numStr(v.monthlySubs),
-    monthlyPriceCny: numStr(v.monthlyPriceCny),
-    quarterlySubs: numStr(v.quarterlySubs),
-    quarterlyPriceCny: numStr(v.quarterlyPriceCny),
-    yearlySubs: numStr(v.yearlySubs),
-    yearlyPriceCny: numStr(v.yearlyPriceCny),
+    basicMonthlySubs: numStr(v.basicMonthlySubs),
+    basicMonthlyPriceCny: numStr(v.basicMonthlyPriceCny),
+    basicQuarterlySubs: numStr(v.basicQuarterlySubs),
+    basicQuarterlyPriceCny: numStr(v.basicQuarterlyPriceCny),
+    basicYearlySubs: numStr(v.basicYearlySubs),
+    basicYearlyPriceCny: numStr(v.basicYearlyPriceCny),
+    premiumMonthlySubs: numStr(v.premiumMonthlySubs),
+    premiumMonthlyPriceCny: numStr(v.premiumMonthlyPriceCny),
+    premiumQuarterlySubs: numStr(v.premiumQuarterlySubs),
+    premiumQuarterlyPriceCny: numStr(v.premiumQuarterlyPriceCny),
+    premiumYearlySubs: numStr(v.premiumYearlySubs),
+    premiumYearlyPriceCny: numStr(v.premiumYearlyPriceCny),
     viewerGrowthPct: pctStr(v.viewerGrowth),
     subscriberGrowthPct: pctStr(v.subscriberGrowth),
     horizonMonths: String(v.horizonMonths ?? 24),
@@ -202,10 +222,14 @@ function draftToVars(d: Draft): ThkcosVars {
     syncGbPerMonth: parseNum(d.syncGbPerMonth),
     syncPerGbCny: parseNum(d.syncPerGbCny),
     trafficMode: d.trafficMode,
-    viewers: parseNum(d.viewers),
-    titlesPerViewer: parseNum(d.titlesPerViewer),
-    perTitleGbLow: parseNum(d.perTitleGbLow),
-    perTitleGbHigh: parseNum(d.perTitleGbHigh),
+    basicViewers: parseNum(d.basicViewers),
+    premiumViewers: parseNum(d.premiumViewers),
+    basicMinutesPerViewer: parseNum(d.basicMinutesPerViewer),
+    premiumMinutesPerViewer: parseNum(d.premiumMinutesPerViewer),
+    basicPerMinMbLow: parseNum(d.basicPerMinMbLow),
+    premiumPerMinMbLow: parseNum(d.premiumPerMinMbLow),
+    basicPerMinMbHigh: parseNum(d.basicPerMinMbHigh),
+    premiumPerMinMbHigh: parseNum(d.premiumPerMinMbHigh),
     cacheHitRatio: parsePct(d.cacheHitRatioPct),
     cosDownTiers: pricesToTiers(d.cosDownPrices),
     eoOverageTiers: pricesToTiers(d.eoOveragePrices),
@@ -217,12 +241,18 @@ function draftToVars(d: Draft): ThkcosVars {
     eoPlanMonthlyCny: parseNum(d.eoPlanMonthlyCny),
     eoPlanIncludedGb: parseNum(d.eoPlanIncludedGb),
     eoDeductionRatio: parseNum(d.eoDeductionRatio),
-    monthlySubs: parseNum(d.monthlySubs),
-    monthlyPriceCny: parseNum(d.monthlyPriceCny),
-    quarterlySubs: parseNum(d.quarterlySubs),
-    quarterlyPriceCny: parseNum(d.quarterlyPriceCny),
-    yearlySubs: parseNum(d.yearlySubs),
-    yearlyPriceCny: parseNum(d.yearlyPriceCny),
+    basicMonthlySubs: parseNum(d.basicMonthlySubs),
+    basicMonthlyPriceCny: parseNum(d.basicMonthlyPriceCny),
+    basicQuarterlySubs: parseNum(d.basicQuarterlySubs),
+    basicQuarterlyPriceCny: parseNum(d.basicQuarterlyPriceCny),
+    basicYearlySubs: parseNum(d.basicYearlySubs),
+    basicYearlyPriceCny: parseNum(d.basicYearlyPriceCny),
+    premiumMonthlySubs: parseNum(d.premiumMonthlySubs),
+    premiumMonthlyPriceCny: parseNum(d.premiumMonthlyPriceCny),
+    premiumQuarterlySubs: parseNum(d.premiumQuarterlySubs),
+    premiumQuarterlyPriceCny: parseNum(d.premiumQuarterlyPriceCny),
+    premiumYearlySubs: parseNum(d.premiumYearlySubs),
+    premiumYearlyPriceCny: parseNum(d.premiumYearlyPriceCny),
     viewerGrowth: parsePct(d.viewerGrowthPct),
     subscriberGrowth: parsePct(d.subscriberGrowthPct),
     horizonMonths: parseNum(d.horizonMonths) ?? 24,
@@ -240,10 +270,14 @@ const EMPTY_VARS: ThkcosVars = {
   syncGbPerMonth: null,
   syncPerGbCny: null,
   trafficMode: 'direct',
-  viewers: null,
-  titlesPerViewer: null,
-  perTitleGbLow: null,
-  perTitleGbHigh: null,
+  basicViewers: null,
+  premiumViewers: null,
+  basicMinutesPerViewer: null,
+  premiumMinutesPerViewer: null,
+  basicPerMinMbLow: null,
+  premiumPerMinMbLow: null,
+  basicPerMinMbHigh: null,
+  premiumPerMinMbHigh: null,
   cacheHitRatio: null,
   cosDownTiers: null,
   eoOverageTiers: null,
@@ -255,12 +289,18 @@ const EMPTY_VARS: ThkcosVars = {
   eoPlanMonthlyCny: null,
   eoPlanIncludedGb: null,
   eoDeductionRatio: null,
-  monthlySubs: null,
-  monthlyPriceCny: null,
-  quarterlySubs: null,
-  quarterlyPriceCny: null,
-  yearlySubs: null,
-  yearlyPriceCny: null,
+  basicMonthlySubs: null,
+  basicMonthlyPriceCny: null,
+  basicQuarterlySubs: null,
+  basicQuarterlyPriceCny: null,
+  basicYearlySubs: null,
+  basicYearlyPriceCny: null,
+  premiumMonthlySubs: null,
+  premiumMonthlyPriceCny: null,
+  premiumQuarterlySubs: null,
+  premiumQuarterlyPriceCny: null,
+  premiumYearlySubs: null,
+  premiumYearlyPriceCny: null,
   viewerGrowth: null,
   subscriberGrowth: null,
   horizonMonths: 24,
@@ -313,22 +353,38 @@ const GROUPS: { cn: string; en: string; fields: FieldDef[] }[] = [
     cn: 'COS 流量（直连 / 经 CDN）',
     en: 'COS Traffic',
     fields: [
-      { key: 'viewers', label: 'H · 月观看人数', hint: 'Viewers', unit: '人', placeholder: '如 5000' },
-      { key: 'titlesPerViewer', label: 'I · 人均月观影', hint: 'Titles / Viewer', unit: '部', step: '0.1', placeholder: '如 8' },
-      { key: 'perTitleGbLow', label: 'J · 单片流量下限', hint: '乐观取下限', unit: 'GB', step: '0.1', placeholder: '如 1.5' },
-      { key: 'perTitleGbHigh', label: 'K · 单片流量上限', hint: '悲观取上限', unit: 'GB', step: '0.1', placeholder: '如 4' },
+      { key: 'basicViewers', label: 'H1 · 基础会员月观看人数', hint: 'Regular Viewers', unit: '人', placeholder: '如 4000' },
+      { key: 'basicMinutesPerViewer', label: 'I1 · 基础会员人均月观影', hint: 'Min / Viewer', unit: '分钟', step: '1', placeholder: '如 480' },
+      { key: 'basicPerMinMbLow', label: 'J1 · 基础会员每分钟流量下限', hint: '乐观取下限', unit: 'MB', step: '0.1', placeholder: '如 10' },
+      { key: 'basicPerMinMbHigh', label: 'K1 · 基础会员每分钟流量上限', hint: '悲观取上限', unit: 'MB', step: '0.1', placeholder: '如 20' },
+      { key: 'premiumViewers', label: 'H2 · 高级会员月观看人数', hint: 'Heavy Viewers', unit: '人', placeholder: '如 1000' },
+      { key: 'premiumMinutesPerViewer', label: 'I2 · 高级会员人均月观影', hint: 'Min / Viewer', unit: '分钟', step: '1', placeholder: '如 1800' },
+      { key: 'premiumPerMinMbLow', label: 'J2 · 高级会员每分钟流量下限', hint: '乐观取下限', unit: 'MB', step: '0.1', placeholder: '如 14' },
+      { key: 'premiumPerMinMbHigh', label: 'K2 · 高级会员每分钟流量上限', hint: '悲观取上限', unit: 'MB', step: '0.1', placeholder: '如 25' },
     ],
   },
   {
-    cn: '订阅收入（月度确认口径）',
-    en: 'Subscription Revenue',
+    cn: '订阅收入 · 基础会员（月度确认口径）',
+    en: 'Basic Subscription',
     fields: [
-      { key: 'monthlySubs', label: 'L1 · 月卡订阅人数', hint: 'Monthly', unit: '人', placeholder: '如 800' },
-      { key: 'monthlyPriceCny', label: 'M1 · 月卡单价', hint: '¥/月', unit: '¥', placeholder: '如 30' },
-      { key: 'quarterlySubs', label: 'L2 · 季卡订阅人数', hint: '实收 ×3', unit: '人', placeholder: '如 300' },
-      { key: 'quarterlyPriceCny', label: 'M2 · 季卡单价', hint: '¥/月 × 3', unit: '¥', placeholder: '如 25', mult: 3 },
-      { key: 'yearlySubs', label: 'L3 · 年卡订阅人数', hint: '实收 ×12', unit: '人', placeholder: '如 200' },
-      { key: 'yearlyPriceCny', label: 'M3 · 年卡单价', hint: '¥/月 × 12', unit: '¥', placeholder: '如 20', mult: 12 },
+      { key: 'basicMonthlySubs', label: 'L1 · 月卡人数', hint: 'Basic · Monthly', unit: '人', placeholder: '如 800' },
+      { key: 'basicMonthlyPriceCny', label: 'M1 · 月卡单价', hint: 'Basic · ¥/月', unit: '¥', placeholder: '如 30' },
+      { key: 'basicQuarterlySubs', label: 'L2 · 季卡人数', hint: '实收 ×3', unit: '人', placeholder: '如 300' },
+      { key: 'basicQuarterlyPriceCny', label: 'M2 · 季卡单价', hint: '¥/月 × 3', unit: '¥', placeholder: '如 25', mult: 3 },
+      { key: 'basicYearlySubs', label: 'L3 · 年卡人数', hint: '实收 ×12', unit: '人', placeholder: '如 200' },
+      { key: 'basicYearlyPriceCny', label: 'M3 · 年卡单价', hint: '¥/月 × 12', unit: '¥', placeholder: '如 20', mult: 12 },
+    ],
+  },
+  {
+    cn: '订阅收入 · 高级会员（月度确认口径）',
+    en: 'Premium Subscription',
+    fields: [
+      { key: 'premiumMonthlySubs', label: 'L4 · 月卡人数', hint: 'Premium · Monthly', unit: '人', placeholder: '如 300' },
+      { key: 'premiumMonthlyPriceCny', label: 'M4 · 月卡单价', hint: 'Premium · ¥/月', unit: '¥', placeholder: '如 68' },
+      { key: 'premiumQuarterlySubs', label: 'L5 · 季卡人数', hint: '实收 ×3', unit: '人', placeholder: '如 120' },
+      { key: 'premiumQuarterlyPriceCny', label: 'M5 · 季卡单价', hint: '¥/月 × 3', unit: '¥', placeholder: '如 58', mult: 3 },
+      { key: 'premiumYearlySubs', label: 'L6 · 年卡人数', hint: '实收 ×12', unit: '人', placeholder: '如 80' },
+      { key: 'premiumYearlyPriceCny', label: 'M6 · 年卡单价', hint: '¥/月 × 12', unit: '¥', placeholder: '如 48', mult: 12 },
     ],
   },
   {
@@ -348,8 +404,8 @@ const fmtQty = (v: number) =>
 /** 统一展示保存日期（后端返回本地时间字符串 YYYY-MM-DD HH:MM:SS）。 */
 const fmtSavedAt = (v: string | null) => (v ? v.slice(0, 16) : '—');
 
-/** 单片流量区间（未填一侧时以另一侧兜底，保证 low ≤ high）。 */
-function gbRange(low: number | null, high: number | null): { low: number; high: number } {
+/** 每分钟流量区间 MB/min（未填一侧时以另一侧兜底，保证 low ≤ high）。 */
+function mbRange(low: number | null, high: number | null): { low: number; high: number } {
   const j = low != null && low > 0 ? low : high ?? 0;
   const k = high != null && high > 0 ? high : low ?? 0;
   return j <= k ? { low: j, high: k } : { low: k, high: j };
@@ -617,11 +673,13 @@ export default function ThkcosModelTab({ productId, fxRate }: { productId: numbe
 
   const isCdn = draft.trafficMode === 'cdn';
 
-  // 消耗流量区间：H × I × 单片流量（上限取 K、下限取 J）÷ 1000 换算 TB
-  const gb = gbRange(vars.perTitleGbLow, vars.perTitleGbHigh);
-  const trafficBase = (vars.viewers ?? 0) * (vars.titlesPerViewer ?? 0);
-  const trafficLowTb = (trafficBase * gb.low) / 1000;
-  const trafficHighTb = (trafficBase * gb.high) / 1000;
+  // 消耗流量区间：普通 + 重度两组各自 人数 × 人均分钟 × 每分钟MB（上限取 K、下限取 J），求和后 ÷ 1024 → GB ÷ 1000 → TB
+  const basicMb = mbRange(vars.basicPerMinMbLow, vars.basicPerMinMbHigh);
+  const premiumMb = mbRange(vars.premiumPerMinMbLow, vars.premiumPerMinMbHigh);
+  const basicBase = (vars.basicViewers ?? 0) * (vars.basicMinutesPerViewer ?? 0);
+  const premiumBase = (vars.premiumViewers ?? 0) * (vars.premiumMinutesPerViewer ?? 0);
+  const trafficLowTb = (basicBase * basicMb.low + premiumBase * premiumMb.low) / (1024 * 1000);
+  const trafficHighTb = (basicBase * basicMb.high + premiumBase * premiumMb.high) / (1024 * 1000);
 
   const curves = SCEN.map((s) => model.curves[s.key]);
   const sharedMaxX = Math.max(...curves.map((c) => c.maxViewers), 1);
@@ -782,7 +840,7 @@ export default function ThkcosModelTab({ productId, fxRate }: { productId: numbe
           <div className="mt-0.5 text-[11px] text-slate-500">
             {neutral.negativeUnitEconomics
               ? '单位经济为负：人均收入 < 流量成本'
-              : `当前 ${formatInt(vars.viewers ?? 0)} 人 · 安全边际 ${
+              : `当前 ${formatInt((vars.basicViewers ?? 0) + (vars.premiumViewers ?? 0))} 人 · 安全边际 ${
                   neutral.safetyMargin == null ? '—' : `${formatRate(neutral.safetyMargin * 100, 0)}%`
                 }`}
           </div>
@@ -1118,7 +1176,7 @@ export default function ThkcosModelTab({ productId, fxRate }: { productId: numbe
                     {s.en} {s.cn}
                   </div>
                   <div className="text-slate-400">
-                    单片流量：<span className="text-slate-200">{m.gbPerTitle} GB</span>
+                    每分钟流量：<span className="text-slate-200">{m.mbPerMin} MB</span>
                   </div>
                   <div className="text-slate-400">
                     平衡人数：

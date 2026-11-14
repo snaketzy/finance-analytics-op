@@ -7,6 +7,7 @@ import {
   progressiveCost,
   packageCost,
   GB_PER_TB,
+  MB_PER_GB,
 } from './econModel';
 
 export type { CdnTier, CdnPackage, CdnPricingMode, CdnPackagePrice };
@@ -40,14 +41,22 @@ export type ThkcosVars = {
   syncPerGbCny: number | null;
   /** 流量计价模式（空 = direct） */
   trafficMode: ThkcosTrafficMode | null;
-  /** H 月观看人数 人 */
-  viewers: number | null;
-  /** I 人均月观看部数 */
-  titlesPerViewer: number | null;
-  /** J 单片流量下限 GB */
-  perTitleGbLow: number | null;
-  /** K 单片流量上限 GB */
-  perTitleGbHigh: number | null;
+  /** H1 基础会员月观看人数 人 */
+  basicViewers: number | null;
+  /** H2 高级会员月观看人数 人 */
+  premiumViewers: number | null;
+  /** I1 基础会员人均月观影分钟数 分钟 */
+  basicMinutesPerViewer: number | null;
+  /** I2 高级会员人均月观影分钟数 分钟 */
+  premiumMinutesPerViewer: number | null;
+  /** J1 基础会员每分钟流量下限 MB */
+  basicPerMinMbLow: number | null;
+  /** J2 高级会员每分钟流量下限 MB */
+  premiumPerMinMbLow: number | null;
+  /** K1 基础会员每分钟流量上限 MB */
+  basicPerMinMbHigh: number | null;
+  /** K2 高级会员每分钟流量上限 MB */
+  premiumPerMinMbHigh: number | null;
   /** λ CDN 缓存命中率 0-1（仅 cdn 模式，回源流量 = 未命中部分） */
   cacheHitRatio: number | null;
   /** 直连：COS 外网下行阶梯（固定 5 档） */
@@ -70,18 +79,30 @@ export type ThkcosVars = {
   eoPlanIncludedGb: number | null;
   /** EO 流量包地区抵扣系数（亚太1区 = 2.49，即 1GB 流量包只抵 1/2.49 GB 流量） */
   eoDeductionRatio: number | null;
-  /** L1 月卡订阅人数 */
-  monthlySubs: number | null;
-  /** M1 月卡 ¥/月 */
-  monthlyPriceCny: number | null;
-  /** L2 季卡订阅人数 */
-  quarterlySubs: number | null;
-  /** M2 季卡 ¥/月（实收 = ×3） */
-  quarterlyPriceCny: number | null;
-  /** L3 年卡订阅人数 */
-  yearlySubs: number | null;
-  /** M3 年卡 ¥/月（实收 = ×12） */
-  yearlyPriceCny: number | null;
+  /** L1 基础会员 · 月卡订阅人数 */
+  basicMonthlySubs: number | null;
+  /** M1 基础会员 · 月卡 ¥/月 */
+  basicMonthlyPriceCny: number | null;
+  /** L2 基础会员 · 季卡订阅人数（实收 ×3） */
+  basicQuarterlySubs: number | null;
+  /** M2 基础会员 · 季卡 ¥/月（实收 = ×3） */
+  basicQuarterlyPriceCny: number | null;
+  /** L3 基础会员 · 年卡订阅人数（实收 ×12） */
+  basicYearlySubs: number | null;
+  /** M3 基础会员 · 年卡 ¥/月（实收 = ×12） */
+  basicYearlyPriceCny: number | null;
+  /** L4 高级会员 · 月卡订阅人数 */
+  premiumMonthlySubs: number | null;
+  /** M4 高级会员 · 月卡 ¥/月 */
+  premiumMonthlyPriceCny: number | null;
+  /** L5 高级会员 · 季卡订阅人数（实收 ×3） */
+  premiumQuarterlySubs: number | null;
+  /** M5 高级会员 · 季卡 ¥/月（实收 = ×3） */
+  premiumQuarterlyPriceCny: number | null;
+  /** L6 高级会员 · 年卡订阅人数（实收 ×12） */
+  premiumYearlySubs: number | null;
+  /** M6 高级会员 · 年卡 ¥/月（实收 = ×12） */
+  premiumYearlyPriceCny: number | null;
   /** 观看人数月净增长率 0-1 */
   viewerGrowth: number | null;
   /** 订阅人数月净增长率 0-1 */
@@ -93,14 +114,14 @@ export type ThkcosVars = {
 export type ThkcosScenarioKey = 'pessimistic' | 'neutral' | 'optimistic';
 export const THKCOS_SCENARIOS: ThkcosScenarioKey[] = ['pessimistic', 'neutral', 'optimistic'];
 
-/** 三档情景的口径：悲观取单片流量上限、乐观取下限。 */
+/** 三档情景的口径：悲观取每分钟流量上限、乐观取下限。 */
 export const THKCOS_SCENARIO_LABEL: Record<
   ThkcosScenarioKey,
   { cn: string; en: string; stroke: string; note: string }
 > = {
-  pessimistic: { cn: '悲观', en: 'Pessimistic', stroke: '#fb7185', note: '单片流量取 K 上限' },
-  neutral: { cn: '中性', en: 'Neutral', stroke: '#38bdf8', note: '单片流量取 (J+K)/2' },
-  optimistic: { cn: '乐观', en: 'Optimistic', stroke: '#34d399', note: '单片流量取 J 下限' },
+  pessimistic: { cn: '悲观', en: 'Pessimistic', stroke: '#fb7185', note: '每分钟流量取 K 上限' },
+  neutral: { cn: '中性', en: 'Neutral', stroke: '#38bdf8', note: '每分钟流量取 (J+K)/2' },
+  optimistic: { cn: '乐观', en: 'Optimistic', stroke: '#34d399', note: '每分钟流量取 J 下限' },
 };
 
 const r2 = (n: number) => Math.round(n * 100) / 100;
@@ -169,10 +190,14 @@ function resolve(vars: ThkcosVars): Numeric {
     syncGbPerMonth: num(vars.syncGbPerMonth),
     syncPerGbCny: num(vars.syncPerGbCny),
     trafficMode: vars.trafficMode === 'cdn' ? 'cdn' : 'direct',
-    viewers: num(vars.viewers),
-    titlesPerViewer: num(vars.titlesPerViewer),
-    perTitleGbLow: num(vars.perTitleGbLow),
-    perTitleGbHigh: num(vars.perTitleGbHigh),
+    basicViewers: num(vars.basicViewers),
+    premiumViewers: num(vars.premiumViewers),
+    basicMinutesPerViewer: num(vars.basicMinutesPerViewer),
+    premiumMinutesPerViewer: num(vars.premiumMinutesPerViewer),
+    basicPerMinMbLow: num(vars.basicPerMinMbLow),
+    premiumPerMinMbLow: num(vars.premiumPerMinMbLow),
+    basicPerMinMbHigh: num(vars.basicPerMinMbHigh),
+    premiumPerMinMbHigh: num(vars.premiumPerMinMbHigh),
     cacheHitRatio: vars.cacheHitRatio == null ? 0 : Math.min(1, Math.max(0, num(vars.cacheHitRatio))),
     cosDownTiers: normalizeTiers(vars.cosDownTiers),
     eoOverageTiers: normalizeTiers(vars.eoOverageTiers),
@@ -184,31 +209,37 @@ function resolve(vars: ThkcosVars): Numeric {
     eoPlanMonthlyCny: num(vars.eoPlanMonthlyCny),
     eoPlanIncludedGb: num(vars.eoPlanIncludedGb),
     eoDeductionRatio: Math.max(0, num(vars.eoDeductionRatio)),
-    monthlySubs: num(vars.monthlySubs),
-    monthlyPriceCny: num(vars.monthlyPriceCny),
-    quarterlySubs: num(vars.quarterlySubs),
-    quarterlyPriceCny: num(vars.quarterlyPriceCny),
-    yearlySubs: num(vars.yearlySubs),
-    yearlyPriceCny: num(vars.yearlyPriceCny),
+    basicMonthlySubs: num(vars.basicMonthlySubs),
+    basicMonthlyPriceCny: num(vars.basicMonthlyPriceCny),
+    basicQuarterlySubs: num(vars.basicQuarterlySubs),
+    basicQuarterlyPriceCny: num(vars.basicQuarterlyPriceCny),
+    basicYearlySubs: num(vars.basicYearlySubs),
+    basicYearlyPriceCny: num(vars.basicYearlyPriceCny),
+    premiumMonthlySubs: num(vars.premiumMonthlySubs),
+    premiumMonthlyPriceCny: num(vars.premiumMonthlyPriceCny),
+    premiumQuarterlySubs: num(vars.premiumQuarterlySubs),
+    premiumQuarterlyPriceCny: num(vars.premiumQuarterlyPriceCny),
+    premiumYearlySubs: num(vars.premiumYearlySubs),
+    premiumYearlyPriceCny: num(vars.premiumYearlyPriceCny),
     viewerGrowth: num(vars.viewerGrowth),
     subscriberGrowth: num(vars.subscriberGrowth),
     horizonMonths: Math.max(1, Math.min(60, num(vars.horizonMonths) || 24)),
   };
 }
 
-/** 单片流量区间（未填一侧时以另一侧兜底）。 */
-function gbRange(v: Numeric): { low: number; high: number } {
-  const j = v.perTitleGbLow > 0 ? v.perTitleGbLow : v.perTitleGbHigh;
-  const k = v.perTitleGbHigh > 0 ? v.perTitleGbHigh : v.perTitleGbLow;
+/** 某组的每分钟流量区间（未填一侧时以另一侧兜底）。 */
+function mbRangeOf(low: number, high: number): { low: number; high: number } {
+  const j = low > 0 ? low : high;
+  const k = high > 0 ? high : low;
   return j <= k ? { low: j, high: k } : { low: k, high: j };
 }
 
-/** 某情景下的单片流量取值。 */
-function gbForScenario(v: Numeric, scenario: ThkcosScenarioKey): number {
-  const { low, high } = gbRange(v);
-  if (scenario === 'optimistic') return low;
-  if (scenario === 'pessimistic') return high;
-  return (low + high) / 2;
+/** 某组在某情景下的每分钟流量取值（MB）。 */
+function mbForGroup(low: number, high: number, scenario: ThkcosScenarioKey): number {
+  const { low: lo, high: hi } = mbRangeOf(low, high);
+  if (scenario === 'optimistic') return lo;
+  if (scenario === 'pessimistic') return hi;
+  return (lo + hi) / 2;
 }
 
 /** 阶梯数组的首档单价（无流量时作为等效均价的兜底展示）。 */
@@ -222,6 +253,30 @@ function firstPackageUnit(p: CdnPackage[] | null, priceKey: CdnPackagePrice): nu
   const f = p[0];
   const price = priceKey === 'list' ? f.listCny : f.renewCny;
   return f.sizeGb > 0 ? (price / f.sizeGb) * GB_PER_TB : 0;
+}
+
+/** 订阅收入（月度确认口径）：基础/高级 × 月/季/年 六档合计。 */
+function subsRevenue(v: Numeric): number {
+  return (
+    v.basicMonthlySubs * v.basicMonthlyPriceCny +
+    v.basicQuarterlySubs * v.basicQuarterlyPriceCny +
+    v.basicYearlySubs * v.basicYearlyPriceCny +
+    v.premiumMonthlySubs * v.premiumMonthlyPriceCny +
+    v.premiumQuarterlySubs * v.premiumQuarterlyPriceCny +
+    v.premiumYearlySubs * v.premiumYearlyPriceCny
+  );
+}
+
+/** 订阅人数合计（基础 + 高级 × 月/季/年）。 */
+function subsCount(v: Numeric): number {
+  return (
+    v.basicMonthlySubs +
+    v.basicQuarterlySubs +
+    v.basicYearlySubs +
+    v.premiumMonthlySubs +
+    v.premiumQuarterlySubs +
+    v.premiumYearlySubs
+  );
 }
 
 /* ------------------------------------------------------------------ */
@@ -240,8 +295,8 @@ export type ThkcosCostItem = {
 
 export type ThkcosMetrics = {
   scenario: ThkcosScenarioKey;
-  /** 本情景采用的单片流量（GB）。 */
-  gbPerTitle: number;
+  /** 本情景采用的每分钟流量（MB）。 */
+  mbPerMin: number;
   domainMonthlyCny: number;
   sslMonthlyCny: number;
   r2StorageMonthlyCny: number;
@@ -261,8 +316,8 @@ export type ThkcosMetrics = {
   netMargin: number | null;
   /** 每观看人次的流量边际成本。 */
   trafficPerViewerCny: number;
-  /** 每部影片的流量成本。 */
-  trafficPerTitleCny: number;
+  /** 每分钟流量的流量成本。 */
+  trafficPerMinCny: number;
   perViewerRevenueCny: number | null;
   perViewerCostCny: number | null;
   /** 盈亏平衡观看人数；null = 结构上不可达或与人数无关。 */
@@ -281,16 +336,17 @@ export type ThkcosMetrics = {
  *   存储 = D·E·(B + C)（R2 主副本 + COS 镜像副本，同容量）
  *   同步 = F·G
  *   基座固定 = A + 域名/12 + SSL/12 + 存储 + 同步 + EO 套餐月费（仅经 EO 模式）
- *   流量TB = H·I·单片GB / 1000
+ *   流量TB = H·I·每分钟MB / (1024×1000)
  *   direct：流量费用 = 累进(流量TB, COS 外网下行阶梯) 或 流量包
  *   cdn(EO)：
  *     套餐内含流量先抵扣 → 超出部分走「全球流量包 × 地区抵扣系数」或「超量阶梯累进」
  *     回源量 = 全量 × (1 − 缓存命中率)，始终按 COS 回源阶梯累进
- *   收入 = L1·M1 + L2·M2 + L3·M3（季卡/年卡按月度确认口径折算）
+ *   收入 = 基础/高级 × 月/季/年 六档合计（季卡/年卡按月度确认口径折算）
  */
 export function computeThkcos(vars: ThkcosVars, scenario: ThkcosScenarioKey): ThkcosMetrics {
   const v = resolve(vars);
-  const gbPerTitle = gbForScenario(v, scenario);
+  const basicMb = mbForGroup(v.basicPerMinMbLow, v.basicPerMinMbHigh, scenario);
+  const premiumMb = mbForGroup(v.premiumPerMinMbLow, v.premiumPerMinMbHigh, scenario);
 
   const domainMonthlyCny = v.domainAnnualCny / 12;
   const sslMonthlyCny = v.sslAnnualCny / 12;
@@ -302,7 +358,15 @@ export function computeThkcos(vars: ThkcosVars, scenario: ThkcosScenarioKey): Th
   const eoPlanCny = v.trafficMode === 'cdn' ? v.eoPlanMonthlyCny : 0;
   const baseFixedCny = v.vultrMonthlyCny + domainMonthlyCny + sslMonthlyCny + storageMonthlyCny + syncMonthlyCny + eoPlanCny;
 
-  const trafficGb = v.viewers * v.titlesPerViewer * gbPerTitle;
+  // 普通 + 重度两组各自：人数 × 人均分钟 × 每分钟 MB，求和得总 MB → GB → TB
+  const totalViewers = v.basicViewers + v.premiumViewers;
+  const totalMinutes =
+    v.basicViewers * v.basicMinutesPerViewer + v.premiumViewers * v.premiumMinutesPerViewer;
+  const trafficMb =
+    v.basicViewers * v.basicMinutesPerViewer * basicMb +
+    v.premiumViewers * v.premiumMinutesPerViewer * premiumMb;
+  const mbPerMin = totalMinutes > 0 ? trafficMb / totalMinutes : 0;
+  const trafficGb = trafficMb / MB_PER_GB;
   const trafficTb = trafficGb / GB_PER_TB;
   const isPackage = v.cdnPricingMode === 'package';
 
@@ -334,11 +398,12 @@ export function computeThkcos(vars: ThkcosVars, scenario: ThkcosScenarioKey): Th
           : firstTierPrice(v.cosDownTiers);
 
   const totalCostCny = baseFixedCny + trafficCny;
-  const revenueCny = v.monthlySubs * v.monthlyPriceCny + v.quarterlySubs * v.quarterlyPriceCny + v.yearlySubs * v.yearlyPriceCny;
+  const revenueCny = subsRevenue(v);
   const netCny = revenueCny - totalCostCny;
 
-  const trafficPerTitleCny = (gbPerTitle / GB_PER_TB) * blendedPerTbCny;
-  const trafficPerViewerCny = v.titlesPerViewer * trafficPerTitleCny;
+  // 按总分钟 / 总人数摊薄（两组口径加权平均）
+  const trafficPerMinCny = totalMinutes > 0 ? trafficCny / totalMinutes : 0;
+  const trafficPerViewerCny = totalViewers > 0 ? trafficCny / totalViewers : 0;
 
   // 收入不随观看人数变化，故固定成本已高于收入时，增加人数只会放大亏损。
   const breakEvenViewersRaw =
@@ -352,10 +417,10 @@ export function computeThkcos(vars: ThkcosVars, scenario: ThkcosScenarioKey): Th
       : null;
   const breakEvenTitles = breakEvenTitlesRaw != null && breakEvenTitlesRaw > 0 ? r2(breakEvenTitlesRaw) : null;
 
-  const perViewerRevenueCny = v.viewers > 0 ? revenueCny / v.viewers : null;
-  const perViewerCostCny = v.viewers > 0 ? totalCostCny / v.viewers : null;
+  const perViewerRevenueCny = totalViewers > 0 ? revenueCny / totalViewers : null;
+  const perViewerCostCny = totalViewers > 0 ? totalCostCny / totalViewers : null;
   const safetyMargin =
-    breakEvenViewers != null && v.viewers > 0 ? r4((v.viewers - breakEvenViewers) / v.viewers) : null;
+    breakEvenViewers != null && totalViewers > 0 ? r4((totalViewers - breakEvenViewers) / totalViewers) : null;
 
   const rawCosts: Omit<ThkcosCostItem, 'share'>[] = [
     { key: 'vultr', labelCn: 'Vultr 云主机', labelEn: 'Vultr Host', cny: v.vultrMonthlyCny, group: 'fixed' },
@@ -380,7 +445,7 @@ export function computeThkcos(vars: ThkcosVars, scenario: ThkcosScenarioKey): Th
 
   return {
     scenario,
-    gbPerTitle: r2(gbPerTitle),
+    mbPerMin: r2(mbPerMin),
     domainMonthlyCny: r2(domainMonthlyCny),
     sslMonthlyCny: r2(sslMonthlyCny),
     r2StorageMonthlyCny: r2(r2StorageMonthlyCny),
@@ -397,7 +462,7 @@ export function computeThkcos(vars: ThkcosVars, scenario: ThkcosScenarioKey): Th
     netCny: r2(netCny),
     netMargin: revenueCny > 0 ? r4(netCny / revenueCny) : null,
     trafficPerViewerCny: r4(trafficPerViewerCny),
-    trafficPerTitleCny: r4(trafficPerTitleCny),
+    trafficPerMinCny: r4(trafficPerMinCny),
     perViewerRevenueCny: perViewerRevenueCny == null ? null : r2(perViewerRevenueCny),
     perViewerCostCny: perViewerCostCny == null ? null : r2(perViewerCostCny),
     breakEvenViewers,
@@ -433,9 +498,10 @@ export type ThkcosCurve = {
 export function thkcosCurve(vars: ThkcosVars, scenario: ThkcosScenarioKey, samples = 24): ThkcosCurve {
   const v = resolve(vars);
   const m = computeThkcos(vars, scenario);
+  const totalViewers = v.basicViewers + v.premiumViewers;
   const span = Math.max(
     m.breakEvenViewers != null ? m.breakEvenViewers * 1.8 : 0,
-    v.viewers * 1.5,
+    totalViewers * 1.5,
     100
   );
   const maxViewers = Math.ceil(span / 50) * 50;
@@ -455,7 +521,7 @@ export function thkcosCurve(vars: ThkcosVars, scenario: ThkcosScenarioKey, sampl
     scenario,
     points,
     maxViewers,
-    currentViewers: r2(v.viewers),
+    currentViewers: r2(totalViewers),
     breakEvenViewers: m.breakEvenViewers,
   };
 }
@@ -488,7 +554,8 @@ export type ThkcosProjection = {
 export function projectThkcos(vars: ThkcosVars, scenario: ThkcosScenarioKey, fromYm: string): ThkcosProjection {
   const v = resolve(vars);
   const m = computeThkcos(vars, scenario);
-  const subs = v.monthlySubs + v.quarterlySubs + v.yearlySubs;
+  const subs = subsCount(v);
+  const totalViewers = v.basicViewers + v.premiumViewers;
 
   const points: ThkcosProjectionPoint[] = [];
   let cum = 0;
@@ -496,7 +563,7 @@ export function projectThkcos(vars: ThkcosVars, scenario: ThkcosScenarioKey, fro
   let paybackMonth: number | null = null;
 
   for (let i = 0; i <= v.horizonMonths; i++) {
-    const viewers = v.viewers * Math.pow(1 + v.viewerGrowth, i);
+    const viewers = totalViewers * Math.pow(1 + v.viewerGrowth, i);
     const subsI = subs * Math.pow(1 + v.subscriberGrowth, i);
     const revenueCny = v.subscriberGrowth === 0 ? m.revenueCny : m.revenueCny * Math.pow(1 + v.subscriberGrowth, i);
     const totalCostCny = m.baseFixedCny + viewers * m.trafficPerViewerCny;
@@ -545,8 +612,12 @@ const TIER_FIELDS: (keyof ThkcosVars)[] = ['cosDownTiers', 'eoOverageTiers', 'co
 const PACKAGE_FIELDS: (keyof ThkcosVars)[] = ['cosDownPackages', 'eoPackages'];
 
 const PERTURB_TARGETS: PerturbTarget[] = [
-  { key: 'perTitleGb', labelCn: '单片流量 J~K', labelEn: 'GB / Title', fields: ['perTitleGbLow', 'perTitleGbHigh'] },
-  { key: 'titlesPerViewer', labelCn: '人均月观影部数', labelEn: 'Titles / Viewer', fields: ['titlesPerViewer'] },
+  { key: 'basicPerMinMb', labelCn: '基础会员每分钟流量 J1~K1', labelEn: 'Basic MB/Min', fields: ['basicPerMinMbLow', 'basicPerMinMbHigh'] },
+  { key: 'premiumPerMinMb', labelCn: '高级会员每分钟流量 J2~K2', labelEn: 'Premium MB/Min', fields: ['premiumPerMinMbLow', 'premiumPerMinMbHigh'] },
+  { key: 'basicMinutes', labelCn: '基础会员人均月观影分钟数', labelEn: 'Basic Min/Viewer', fields: ['basicMinutesPerViewer'] },
+  { key: 'premiumMinutes', labelCn: '高级会员人均月观影分钟数', labelEn: 'Premium Min/Viewer', fields: ['premiumMinutesPerViewer'] },
+  { key: 'basicViewers', labelCn: '基础会员人数 H1', labelEn: 'Basic Viewers', fields: ['basicViewers'] },
+  { key: 'premiumViewers', labelCn: '高级会员人数 H2', labelEn: 'Premium Viewers', fields: ['premiumViewers'] },
   { key: 'cosDown', labelCn: 'COS 外网下行单价', labelEn: 'COS Egress ¥/TB', fields: ['cosDownTiers'] },
   { key: 'eoOverage', labelCn: 'EO 超量阶梯单价', labelEn: 'EO Overage ¥/TB', fields: ['eoOverageTiers'] },
   { key: 'cosOrigin', labelCn: 'COS 回源单价', labelEn: 'COS Origin ¥/TB', fields: ['cosOriginTiers'] },
@@ -557,10 +628,10 @@ const PERTURB_TARGETS: PerturbTarget[] = [
   { key: 'cacheHit', labelCn: 'EO 缓存命中率 λ', labelEn: 'Cache Hit', fields: ['cacheHitRatio'] },
   { key: 'syncGb', labelCn: '增量同步数据量 F', labelEn: 'Sync GB/mo', fields: ['syncGbPerMonth'] },
   { key: 'syncUnit', labelCn: '同步单价 G', labelEn: 'Sync ¥/GB', fields: ['syncPerGbCny'] },
-  { key: 'subs', labelCn: '订阅人数 L1/L2/L3', labelEn: 'Subscribers', fields: ['monthlySubs', 'quarterlySubs', 'yearlySubs'] },
-  { key: 'monthlyPrice', labelCn: '月卡单价 M1', labelEn: 'Monthly Price', fields: ['monthlyPriceCny'] },
-  { key: 'quarterlyPrice', labelCn: '季卡单价 M2', labelEn: 'Quarterly Price', fields: ['quarterlyPriceCny'] },
-  { key: 'yearlyPrice', labelCn: '年卡单价 M3', labelEn: 'Yearly Price', fields: ['yearlyPriceCny'] },
+  { key: 'basicSubs', labelCn: '基础会员人数 L1/L2/L3', labelEn: 'Basic Subs', fields: ['basicMonthlySubs', 'basicQuarterlySubs', 'basicYearlySubs'] },
+  { key: 'premiumSubs', labelCn: '高级会员人数 L4/L5/L6', labelEn: 'Premium Subs', fields: ['premiumMonthlySubs', 'premiumQuarterlySubs', 'premiumYearlySubs'] },
+  { key: 'basicPrice', labelCn: '基础会员单价 M1/M2/M3', labelEn: 'Basic Price', fields: ['basicMonthlyPriceCny', 'basicQuarterlyPriceCny', 'basicYearlyPriceCny'] },
+  { key: 'premiumPrice', labelCn: '高级会员单价 M4/M5/M6', labelEn: 'Premium Price', fields: ['premiumMonthlyPriceCny', 'premiumQuarterlyPriceCny', 'premiumYearlyPriceCny'] },
   { key: 'vultr', labelCn: 'Vultr 月租 A', labelEn: 'Vultr Host', fields: ['vultrMonthlyCny'] },
   { key: 'domain', labelCn: '域名年费', labelEn: 'Domain', fields: ['domainAnnualCny'] },
   { key: 'ssl', labelCn: 'SSL 证书年费', labelEn: 'SSL Cert', fields: ['sslAnnualCny'] },
@@ -646,15 +717,29 @@ export type ThkcosModel = {
 export function thkcosWarnings(vars: ThkcosVars): string[] {
   const v = resolve(vars);
   const out: string[] = [];
-  if (v.monthlySubs + v.quarterlySubs + v.yearlySubs === 0) out.push('未填订阅人数，月收入为 0。');
-  if (v.monthlyPriceCny + v.quarterlyPriceCny + v.yearlyPriceCny === 0) out.push('未填订阅单价，月收入为 0。');
+  const subs = subsCount(v);
+  const totalViewers = v.basicViewers + v.premiumViewers;
+  if (subs === 0) out.push('未填订阅人数，月收入为 0。');
+  const priceSum =
+    v.basicMonthlyPriceCny + v.basicQuarterlyPriceCny + v.basicYearlyPriceCny +
+    v.premiumMonthlyPriceCny + v.premiumQuarterlyPriceCny + v.premiumYearlyPriceCny;
+  if (priceSum === 0) out.push('未填订阅单价，月收入为 0。');
   if (v.libraryTitles === 0 || v.avgTitleGb === 0 || (v.r2StoragePerGbCny === 0 && v.cosStoragePerGbCny === 0)) {
     out.push('片库数量、单片体积或存储单价为空，存储成本按 0 计。');
   }
   if (v.syncGbPerMonth === 0 || v.syncPerGbCny === 0) out.push('增量同步数据量或同步单价为空，同步成本按 0 计。');
-  if (v.viewers === 0 || v.titlesPerViewer === 0) out.push('观看人数或人均观影部数为空，流量成本按 0 计。');
-  if (v.perTitleGbLow > 0 && v.perTitleGbHigh > 0 && v.perTitleGbLow > v.perTitleGbHigh) {
-    out.push('单片流量下限 J 大于上限 K，已自动交换后计算。');
+  if (totalViewers === 0) out.push('基础/高级会员人数为空，流量成本按 0 计。');
+  if (totalViewers > 0 && (v.basicMinutesPerViewer + v.premiumMinutesPerViewer === 0)) {
+    out.push('人均观影分钟数为空，流量成本按 0 计。');
+  }
+  if (v.basicPerMinMbLow > 0 && v.basicPerMinMbHigh > 0 && v.basicPerMinMbLow > v.basicPerMinMbHigh) {
+    out.push('基础会员每分钟流量下限 J1 大于上限 K1，已自动交换后计算。');
+  }
+  if (v.premiumPerMinMbLow > 0 && v.premiumPerMinMbHigh > 0 && v.premiumPerMinMbLow > v.premiumPerMinMbHigh) {
+    out.push('高级会员每分钟流量下限 J2 大于上限 K2，已自动交换后计算。');
+  }
+  if (totalViewers > subs && subs > 0) {
+    out.push(`基础+高级会员人数（${totalViewers}）超过订阅总人数（${subs}），请核对。`);
   }
   const isPackage = v.cdnPricingMode === 'package';
   const modeCn = isPackage ? '资源包' : '阶梯累进';
