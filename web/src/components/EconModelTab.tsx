@@ -99,6 +99,33 @@ const parsePct = (s: string): number | null => {
   return n === null ? null : n / 100;
 };
 
+const BASIC_SUB_KEYS: (keyof Draft)[] = ['basicMonthlySubs', 'basicQuarterlySubs', 'basicYearlySubs'];
+const PREMIUM_SUB_KEYS: (keyof Draft)[] = ['premiumMonthlySubs', 'premiumQuarterlySubs', 'premiumYearlySubs'];
+
+function sumSubscriberInputs(draft: Draft, keys: (keyof Draft)[]) {
+  return keys.reduce((sum, key) => {
+    const raw = draft[key];
+    return sum + Math.max(0, typeof raw === 'string' ? (parseNum(raw) ?? 0) : 0);
+  }, 0);
+}
+
+function clampViewerInput(value: string, limit: number) {
+  if (value.trim() === '') return value;
+  const parsed = parseNum(value);
+  if (parsed === null) return value;
+  return String(Math.min(Math.max(parsed, 0), limit));
+}
+
+function clampViewersToSubscriberCaps(draft: Draft): Draft {
+  const basicLimit = sumSubscriberInputs(draft, BASIC_SUB_KEYS);
+  const premiumLimit = sumSubscriberInputs(draft, PREMIUM_SUB_KEYS);
+  return {
+    ...draft,
+    basicViewers: clampViewerInput(draft.basicViewers, basicLimit),
+    premiumViewers: clampViewerInput(draft.premiumViewers, premiumLimit),
+  };
+}
+
 /* ------------------------------------------------------------------ */
 /* CDN 阶梯：固定 5 档，仅单价可调（腾讯云「月度阶梯累进」口径）            */
 /* ------------------------------------------------------------------ */
@@ -349,11 +376,11 @@ const GROUPS: { cn: string; en: string; fields: FieldDef[] }[] = [
     en: 'CDN Traffic',
     fields: [
       { key: 'tier1SharePct', label: 'α · 亚太一区占比', hint: '余下走二区', unit: '%', step: '0.1', placeholder: '如 80' },
-      { key: 'basicViewers', label: 'H1 · 基础会员月观看人数', hint: 'Regular Viewers', unit: '人', placeholder: '如 4000' },
+      { key: 'basicViewers', label: 'H1 · 基础会员月观看人数', hint: 'Basic Viewer', unit: '人', placeholder: '如 4000' },
       { key: 'basicMinutesPerViewer', label: 'I1 · 基础会员人均月观影', hint: 'Min / Viewer', unit: '分钟', step: '1', placeholder: '如 480' },
       { key: 'basicPerMinMbLow', label: 'J1 · 基础会员每分钟流量下限', hint: '乐观取下限', unit: 'MB', step: '0.1', placeholder: '如 10' },
       { key: 'basicPerMinMbHigh', label: 'K1 · 基础会员每分钟流量上限', hint: '悲观取上限', unit: 'MB', step: '0.1', placeholder: '如 20' },
-      { key: 'premiumViewers', label: 'H2 · 高级会员月观看人数', hint: 'Heavy Viewers', unit: '人', placeholder: '如 1000' },
+      { key: 'premiumViewers', label: 'H2 · 高级会员月观看人数', hint: 'Premium Viewer', unit: '人', placeholder: '如 1000' },
       { key: 'premiumMinutesPerViewer', label: 'I2 · 高级会员人均月观影', hint: 'Min / Viewer', unit: '分钟', step: '1', placeholder: '如 1800' },
       { key: 'premiumPerMinMbLow', label: 'J2 · 高级会员每分钟流量下限', hint: '乐观取下限', unit: 'MB', step: '0.1', placeholder: '如 14' },
       { key: 'premiumPerMinMbHigh', label: 'K2 · 高级会员每分钟流量上限', hint: '悲观取上限', unit: 'MB', step: '0.1', placeholder: '如 25' },
@@ -617,7 +644,21 @@ export default function EconModelTab({ productId, fxRate }: { productId: number;
   const reference = model?.reference;
 
   const set = (key: keyof Draft, value: string) =>
-    setDraft((d) => ({ ...d, [key]: value }) as Draft);
+    setDraft((d) => {
+      const next = { ...d, [key]: value } as Draft;
+      if (key === 'basicViewers') {
+        next.basicViewers = clampViewerInput(value, sumSubscriberInputs(next, BASIC_SUB_KEYS));
+        return next;
+      }
+      if (key === 'premiumViewers') {
+        next.premiumViewers = clampViewerInput(value, sumSubscriberInputs(next, PREMIUM_SUB_KEYS));
+        return next;
+      }
+      if (BASIC_SUB_KEYS.includes(key) || PREMIUM_SUB_KEYS.includes(key)) {
+        return clampViewersToSubscriberCaps(next);
+      }
+      return next;
+    });
 
   /** 修改某一档的单价。 */
   const setTierPrice = (key: 'cdnTier1Prices' | 'cdnTier2Prices', index: number, value: string) =>
@@ -726,6 +767,8 @@ export default function EconModelTab({ productId, fxRate }: { productId: number;
   // CDN 消耗流量区间：基础 + 高级两组各自 人数 × 人均分钟 × 每分钟MB（上限取 K、下限取 J），求和后 ÷ (1024×1000) 换算 TB
   const basicMb = mbRange(vars.basicPerMinMbLow, vars.basicPerMinMbHigh);
   const premiumMb = mbRange(vars.premiumPerMinMbLow, vars.premiumPerMinMbHigh);
+  const basicSubscriberLimit = sumSubscriberInputs(draft, BASIC_SUB_KEYS);
+  const premiumSubscriberLimit = sumSubscriberInputs(draft, PREMIUM_SUB_KEYS);
   const basicBase = (vars.basicViewers ?? 0) * (vars.basicMinutesPerViewer ?? 0);
   const premiumBase = (vars.premiumViewers ?? 0) * (vars.premiumMinutesPerViewer ?? 0);
   const trafficLowTb = (basicBase * basicMb.low + premiumBase * premiumMb.low) / (1024 * 1000);
@@ -947,12 +990,30 @@ export default function EconModelTab({ productId, fxRate }: { productId: number;
                   const raw = draft[f.key];
                   const unitPrice = f.mult && typeof raw === 'string' ? parseNum(raw) : null;
                   const actualCny = unitPrice != null ? unitPrice * (f.mult as number) : null;
+                  const viewerLimit =
+                    f.key === 'basicViewers'
+                      ? basicSubscriberLimit
+                      : f.key === 'premiumViewers'
+                        ? premiumSubscriberLimit
+                        : null;
+                  const viewerValue = typeof raw === 'string' ? parseNum(raw) : null;
+                  const viewerExceeded =
+                    (f.key === 'basicViewers' && viewerValue != null && viewerValue > basicSubscriberLimit) ||
+                    (f.key === 'premiumViewers' && viewerValue != null && viewerValue > premiumSubscriberLimit);
+                  const viewerHint = viewerExceeded
+                    ? f.key === 'basicViewers'
+                      ? `已超过基础会员订阅总人数（L1+L2+L3，当前上限 ${formatInt(basicSubscriberLimit)} 人）`
+                      : f.key === 'premiumViewers'
+                        ? `已超过高级会员订阅总人数（L4+L5+L6，当前上限 ${formatInt(premiumSubscriberLimit)} 人）`
+                        : null
+                    : null;
                   return (
                     <Field key={f.key} label={f.label} hint={f.hint}>
                       <div className="relative">
                         <Input
                           type="number"
                           min="0"
+                          max={viewerLimit ?? undefined}
                           step={f.step ?? '1'}
                           value={draft[f.key]}
                           onChange={(e) => set(f.key, e.target.value)}
@@ -968,6 +1029,7 @@ export default function EconModelTab({ productId, fxRate }: { productId: number;
                           {f.unit ? <span className="text-slate-500">{f.unit}</span> : null}
                         </span>
                       </div>
+                      {viewerHint ? <div className="mt-1 text-[10px] text-amber-400/90">{viewerHint}</div> : null}
                     </Field>
                   );
                 })}
