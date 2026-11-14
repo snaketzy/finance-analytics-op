@@ -63,34 +63,46 @@ export type EconVars = {
   cdnTier2Packages: CdnPackage[] | null;
   /** α 亚太一区流量占比 0-1 */
   tier1Share: number | null;
-  /** H1 普通用户月观看人数 人 */
-  regularViewers: number | null;
-  /** H2 重度用户月观看人数 人 */
-  heavyViewers: number | null;
-  /** I1 普通用户人均月观影分钟数 分钟 */
-  regularMinutesPerViewer: number | null;
-  /** I2 重度用户人均月观影分钟数 分钟 */
-  heavyMinutesPerViewer: number | null;
-  /** J1 普通用户每分钟流量下限 MB */
-  regularPerMinMbLow: number | null;
-  /** J2 重度用户每分钟流量下限 MB */
-  heavyPerMinMbLow: number | null;
-  /** K1 普通用户每分钟流量上限 MB */
-  regularPerMinMbHigh: number | null;
-  /** K2 重度用户每分钟流量上限 MB */
-  heavyPerMinMbHigh: number | null;
-  /** L1 月卡订阅人数 */
-  monthlySubs: number | null;
-  /** M1 月卡 ¥/月 */
-  monthlyPriceCny: number | null;
-  /** L2 季卡订阅人数 */
-  quarterlySubs: number | null;
-  /** M2 季卡 ¥/月（实收 = ×3） */
-  quarterlyPriceCny: number | null;
-  /** L3 年卡订阅人数 */
-  yearlySubs: number | null;
-  /** M3 年卡 ¥/月（实收 = ×12） */
-  yearlyPriceCny: number | null;
+  /** H1 基础会员月观看人数 人 */
+  basicViewers: number | null;
+  /** H2 高级会员月观看人数 人 */
+  premiumViewers: number | null;
+  /** I1 基础会员人均月观影分钟数 分钟 */
+  basicMinutesPerViewer: number | null;
+  /** I2 高级会员人均月观影分钟数 分钟 */
+  premiumMinutesPerViewer: number | null;
+  /** J1 基础会员每分钟流量下限 MB */
+  basicPerMinMbLow: number | null;
+  /** J2 高级会员每分钟流量下限 MB */
+  premiumPerMinMbLow: number | null;
+  /** K1 基础会员每分钟流量上限 MB */
+  basicPerMinMbHigh: number | null;
+  /** K2 高级会员每分钟流量上限 MB */
+  premiumPerMinMbHigh: number | null;
+  /** L1 基础会员 · 月卡订阅人数 */
+  basicMonthlySubs: number | null;
+  /** M1 基础会员 · 月卡 ¥/月 */
+  basicMonthlyPriceCny: number | null;
+  /** L2 基础会员 · 季卡订阅人数（实收 ×3） */
+  basicQuarterlySubs: number | null;
+  /** M2 基础会员 · 季卡 ¥/月（实收 = ×3） */
+  basicQuarterlyPriceCny: number | null;
+  /** L3 基础会员 · 年卡订阅人数（实收 ×12） */
+  basicYearlySubs: number | null;
+  /** M3 基础会员 · 年卡 ¥/月（实收 = ×12） */
+  basicYearlyPriceCny: number | null;
+  /** L4 高级会员 · 月卡订阅人数 */
+  premiumMonthlySubs: number | null;
+  /** M4 高级会员 · 月卡 ¥/月 */
+  premiumMonthlyPriceCny: number | null;
+  /** L5 高级会员 · 季卡订阅人数（实收 ×3） */
+  premiumQuarterlySubs: number | null;
+  /** M5 高级会员 · 季卡 ¥/月（实收 = ×3） */
+  premiumQuarterlyPriceCny: number | null;
+  /** L6 高级会员 · 年卡订阅人数（实收 ×12） */
+  premiumYearlySubs: number | null;
+  /** M6 高级会员 · 年卡 ¥/月（实收 = ×12） */
+  premiumYearlyPriceCny: number | null;
   /** 观看人数月净增长率 0-1 */
   viewerGrowth: number | null;
   /** 订阅人数月净增长率 0-1 */
@@ -245,20 +257,26 @@ function resolve(vars: EconVars): Numeric {
     cdnTier1Packages: normalizePackages(vars.cdnTier1Packages),
     cdnTier2Packages: normalizePackages(vars.cdnTier2Packages),
     tier1Share: vars.tier1Share == null ? 1 : Math.min(1, Math.max(0, num(vars.tier1Share))),
-    regularViewers: num(vars.regularViewers),
-    heavyViewers: num(vars.heavyViewers),
-    regularMinutesPerViewer: num(vars.regularMinutesPerViewer),
-    heavyMinutesPerViewer: num(vars.heavyMinutesPerViewer),
-    regularPerMinMbLow: num(vars.regularPerMinMbLow),
-    heavyPerMinMbLow: num(vars.heavyPerMinMbLow),
-    regularPerMinMbHigh: num(vars.regularPerMinMbHigh),
-    heavyPerMinMbHigh: num(vars.heavyPerMinMbHigh),
-    monthlySubs: num(vars.monthlySubs),
-    monthlyPriceCny: num(vars.monthlyPriceCny),
-    quarterlySubs: num(vars.quarterlySubs),
-    quarterlyPriceCny: num(vars.quarterlyPriceCny),
-    yearlySubs: num(vars.yearlySubs),
-    yearlyPriceCny: num(vars.yearlyPriceCny),
+    basicViewers: num(vars.basicViewers),
+    premiumViewers: num(vars.premiumViewers),
+    basicMinutesPerViewer: num(vars.basicMinutesPerViewer),
+    premiumMinutesPerViewer: num(vars.premiumMinutesPerViewer),
+    basicPerMinMbLow: num(vars.basicPerMinMbLow),
+    premiumPerMinMbLow: num(vars.premiumPerMinMbLow),
+    basicPerMinMbHigh: num(vars.basicPerMinMbHigh),
+    premiumPerMinMbHigh: num(vars.premiumPerMinMbHigh),
+    basicMonthlySubs: num(vars.basicMonthlySubs),
+    basicMonthlyPriceCny: num(vars.basicMonthlyPriceCny),
+    basicQuarterlySubs: num(vars.basicQuarterlySubs),
+    basicQuarterlyPriceCny: num(vars.basicQuarterlyPriceCny),
+    basicYearlySubs: num(vars.basicYearlySubs),
+    basicYearlyPriceCny: num(vars.basicYearlyPriceCny),
+    premiumMonthlySubs: num(vars.premiumMonthlySubs),
+    premiumMonthlyPriceCny: num(vars.premiumMonthlyPriceCny),
+    premiumQuarterlySubs: num(vars.premiumQuarterlySubs),
+    premiumQuarterlyPriceCny: num(vars.premiumQuarterlyPriceCny),
+    premiumYearlySubs: num(vars.premiumYearlySubs),
+    premiumYearlyPriceCny: num(vars.premiumYearlyPriceCny),
     viewerGrowth: num(vars.viewerGrowth),
     subscriberGrowth: num(vars.subscriberGrowth),
     horizonMonths: Math.max(1, Math.min(60, num(vars.horizonMonths) || 24)),
@@ -278,6 +296,30 @@ function mbForGroup(low: number, high: number, scenario: EconScenarioKey): numbe
   if (scenario === 'optimistic') return lo;
   if (scenario === 'pessimistic') return hi;
   return (lo + hi) / 2;
+}
+
+/** 订阅收入（月度确认口径）：基础/高级 × 月/季/年 六档合计。 */
+function subsRevenue(v: Numeric): number {
+  return (
+    v.basicMonthlySubs * v.basicMonthlyPriceCny +
+    v.basicQuarterlySubs * v.basicQuarterlyPriceCny +
+    v.basicYearlySubs * v.basicYearlyPriceCny +
+    v.premiumMonthlySubs * v.premiumMonthlyPriceCny +
+    v.premiumQuarterlySubs * v.premiumQuarterlyPriceCny +
+    v.premiumYearlySubs * v.premiumYearlyPriceCny
+  );
+}
+
+/** 订阅人数合计（基础 + 高级 × 月/季/年）。 */
+function subsCount(v: Numeric): number {
+  return (
+    v.basicMonthlySubs +
+    v.basicQuarterlySubs +
+    v.basicYearlySubs +
+    v.premiumMonthlySubs +
+    v.premiumQuarterlySubs +
+    v.premiumYearlySubs
+  );
 }
 
 /* ------------------------------------------------------------------ */
@@ -336,12 +378,12 @@ export type EconMetrics = {
  *   CDN：tiered 模式 = 累进(一区流量, 一区阶梯) + 累进(二区流量, 二区阶梯)
  *        （阶梯缺失时按 F / G 单档全量计价）
  *        package 模式 = 资源包最优覆盖(一区流量) + 资源包最优覆盖(二区流量)
- *   收入 = L1·M1 + L2·M2 + L3·M3（季卡/年卡按月度确认口径折算）
+ *   收入 = 基础/高级 × 月/季/年 六档合计（季卡/年卡按月度确认口径折算）
  */
 export function computeEcon(vars: EconVars, scenario: EconScenarioKey): EconMetrics {
   const v = resolve(vars);
-  const regMb = mbForGroup(v.regularPerMinMbLow, v.regularPerMinMbHigh, scenario);
-  const hvMb = mbForGroup(v.heavyPerMinMbLow, v.heavyPerMinMbHigh, scenario);
+  const basicMb = mbForGroup(v.basicPerMinMbLow, v.basicPerMinMbHigh, scenario);
+  const premiumMb = mbForGroup(v.premiumPerMinMbLow, v.premiumPerMinMbHigh, scenario);
 
   const domainMonthlyCny = v.domainAnnualCny / 12;
   const sslMonthlyCny = v.sslAnnualCny / 12;
@@ -349,13 +391,13 @@ export function computeEcon(vars: EconVars, scenario: EconScenarioKey): EconMetr
   const baseFixedCny =
     v.vultrMonthlyCny + domainMonthlyCny + sslMonthlyCny + v.r2ClassAMonthlyCny + storageMonthlyCny;
 
-  // 普通 + 重度两组各自：人数 × 人均分钟 × 每分钟 MB，求和得总 MB → GB → TB
-  const totalViewers = v.regularViewers + v.heavyViewers;
+  // 基础 + 高级两组各自：人数 × 人均分钟 × 每分钟 MB，求和得总 MB → GB → TB
+  const totalViewers = v.basicViewers + v.premiumViewers;
   const totalMinutes =
-    v.regularViewers * v.regularMinutesPerViewer + v.heavyViewers * v.heavyMinutesPerViewer;
+    v.basicViewers * v.basicMinutesPerViewer + v.premiumViewers * v.premiumMinutesPerViewer;
   const trafficMb =
-    v.regularViewers * v.regularMinutesPerViewer * regMb +
-    v.heavyViewers * v.heavyMinutesPerViewer * hvMb;
+    v.basicViewers * v.basicMinutesPerViewer * basicMb +
+    v.premiumViewers * v.premiumMinutesPerViewer * premiumMb;
   const mbPerMin = totalMinutes > 0 ? trafficMb / totalMinutes : 0;
   const trafficGb = trafficMb / MB_PER_GB;
   const trafficTb = trafficGb / GB_PER_TB;
@@ -374,7 +416,7 @@ export function computeEcon(vars: EconVars, scenario: EconScenarioKey): EconMetr
       : v.tier1Share * v.cdnTier1PerTbCny + (1 - v.tier1Share) * v.cdnTier2PerTbCny;
 
   const totalCostCny = baseFixedCny + cdnCny;
-  const revenueCny = v.monthlySubs * v.monthlyPriceCny + v.quarterlySubs * v.quarterlyPriceCny + v.yearlySubs * v.yearlyPriceCny;
+  const revenueCny = subsRevenue(v);
   const netCny = revenueCny - totalCostCny;
 
   // 按总分钟 / 总人数摊薄（两组口径加权平均）
@@ -461,7 +503,7 @@ export type EconCurve = {
 export function econCurve(vars: EconVars, scenario: EconScenarioKey, samples = 24): EconCurve {
   const v = resolve(vars);
   const m = computeEcon(vars, scenario);
-  const totalViewers = v.regularViewers + v.heavyViewers;
+  const totalViewers = v.basicViewers + v.premiumViewers;
   const span = Math.max(
     m.breakEvenViewers != null ? m.breakEvenViewers * 1.8 : 0,
     totalViewers * 1.5,
@@ -517,8 +559,8 @@ export type EconProjection = {
 export function projectEcon(vars: EconVars, scenario: EconScenarioKey, fromYm: string): EconProjection {
   const v = resolve(vars);
   const m = computeEcon(vars, scenario);
-  const subs = v.monthlySubs + v.quarterlySubs + v.yearlySubs;
-  const totalViewers = v.regularViewers + v.heavyViewers;
+  const subs = subsCount(v);
+  const totalViewers = v.basicViewers + v.premiumViewers;
 
   const points: EconProjectionPoint[] = [];
   let cum = 0;
@@ -572,19 +614,19 @@ export type EconSensitivityRow = {
 type PerturbTarget = { key: string; labelCn: string; labelEn: string; fields: (keyof EconVars)[] };
 
 const PERTURB_TARGETS: PerturbTarget[] = [
-  { key: 'regPerMinMb', labelCn: '普通用户每分钟流量 J1~K1', labelEn: 'Reg MB/Min', fields: ['regularPerMinMbLow', 'regularPerMinMbHigh'] },
-  { key: 'hvPerMinMb', labelCn: '重度用户每分钟流量 J2~K2', labelEn: 'Heavy MB/Min', fields: ['heavyPerMinMbLow', 'heavyPerMinMbHigh'] },
-  { key: 'regMinutes', labelCn: '普通用户人均月观影分钟数', labelEn: 'Reg Min/Viewer', fields: ['regularMinutesPerViewer'] },
-  { key: 'hvMinutes', labelCn: '重度用户人均月观影分钟数', labelEn: 'Heavy Min/Viewer', fields: ['heavyMinutesPerViewer'] },
-  { key: 'regViewers', labelCn: '普通用户人数 H1', labelEn: 'Reg Viewers', fields: ['regularViewers'] },
-  { key: 'hvViewers', labelCn: '重度用户人数 H2', labelEn: 'Heavy Viewers', fields: ['heavyViewers'] },
+  { key: 'basicPerMinMb', labelCn: '基础会员每分钟流量 J1~K1', labelEn: 'Basic MB/Min', fields: ['basicPerMinMbLow', 'basicPerMinMbHigh'] },
+  { key: 'premiumPerMinMb', labelCn: '高级会员每分钟流量 J2~K2', labelEn: 'Premium MB/Min', fields: ['premiumPerMinMbLow', 'premiumPerMinMbHigh'] },
+  { key: 'basicMinutes', labelCn: '基础会员人均月观影分钟数', labelEn: 'Basic Min/Viewer', fields: ['basicMinutesPerViewer'] },
+  { key: 'premiumMinutes', labelCn: '高级会员人均月观影分钟数', labelEn: 'Premium Min/Viewer', fields: ['premiumMinutesPerViewer'] },
+  { key: 'basicViewers', labelCn: '基础会员人数 H1', labelEn: 'Basic Viewers', fields: ['basicViewers'] },
+  { key: 'premiumViewers', labelCn: '高级会员人数 H2', labelEn: 'Premium Viewers', fields: ['premiumViewers'] },
   { key: 'cdnTier1', labelCn: '亚太一区单价 F', labelEn: 'APAC-1 ¥/TB', fields: ['cdnTier1PerTbCny', 'cdnTier1Tiers', 'cdnTier1Packages'] },
   { key: 'cdnTier2', labelCn: '亚太二区单价 G', labelEn: 'APAC-2 ¥/TB', fields: ['cdnTier2PerTbCny', 'cdnTier2Tiers', 'cdnTier2Packages'] },
   { key: 'tier1Share', labelCn: '亚太一区占比 α', labelEn: 'APAC-1 Share', fields: ['tier1Share'] },
-  { key: 'subs', labelCn: '订阅人数 L1/L2/L3', labelEn: 'Subscribers', fields: ['monthlySubs', 'quarterlySubs', 'yearlySubs'] },
-  { key: 'monthlyPrice', labelCn: '月卡单价 M1', labelEn: 'Monthly Price', fields: ['monthlyPriceCny'] },
-  { key: 'quarterlyPrice', labelCn: '季卡单价 M2', labelEn: 'Quarterly Price', fields: ['quarterlyPriceCny'] },
-  { key: 'yearlyPrice', labelCn: '年卡单价 M3', labelEn: 'Yearly Price', fields: ['yearlyPriceCny'] },
+  { key: 'basicSubs', labelCn: '基础会员人数 L1/L2/L3', labelEn: 'Basic Subs', fields: ['basicMonthlySubs', 'basicQuarterlySubs', 'basicYearlySubs'] },
+  { key: 'premiumSubs', labelCn: '高级会员人数 L4/L5/L6', labelEn: 'Premium Subs', fields: ['premiumMonthlySubs', 'premiumQuarterlySubs', 'premiumYearlySubs'] },
+  { key: 'basicPrice', labelCn: '基础会员单价 M1/M2/M3', labelEn: 'Basic Price', fields: ['basicMonthlyPriceCny', 'basicQuarterlyPriceCny', 'basicYearlyPriceCny'] },
+  { key: 'premiumPrice', labelCn: '高级会员单价 M4/M5/M6', labelEn: 'Premium Price', fields: ['premiumMonthlyPriceCny', 'premiumQuarterlyPriceCny', 'premiumYearlyPriceCny'] },
   { key: 'vultr', labelCn: 'Vultr 月租 A', labelEn: 'Vultr Host', fields: ['vultrMonthlyCny'] },
   { key: 'domain', labelCn: '域名年费', labelEn: 'Domain', fields: ['domainAnnualCny'] },
   { key: 'ssl', labelCn: 'SSL 证书年费', labelEn: 'SSL Cert', fields: ['sslAnnualCny'] },
@@ -668,25 +710,28 @@ export type EconModel = {
 export function econWarnings(vars: EconVars): string[] {
   const v = resolve(vars);
   const out: string[] = [];
-  const subs = v.monthlySubs + v.quarterlySubs + v.yearlySubs;
-  const totalViewers = v.regularViewers + v.heavyViewers;
+  const subs = subsCount(v);
+  const totalViewers = v.basicViewers + v.premiumViewers;
   if (subs === 0) out.push('未填订阅人数，月收入为 0。');
-  if (v.monthlyPriceCny + v.quarterlyPriceCny + v.yearlyPriceCny === 0) out.push('未填订阅单价，月收入为 0。');
+  if (
+    v.basicMonthlyPriceCny + v.basicQuarterlyPriceCny + v.basicYearlyPriceCny +
+    v.premiumMonthlyPriceCny + v.premiumQuarterlyPriceCny + v.premiumYearlyPriceCny === 0
+  ) out.push('未填订阅单价，月收入为 0。');
   if (v.libraryTitles === 0 || v.avgTitleGb === 0 || v.r2StoragePerGbCny === 0) {
     out.push('片库数量、单片体积或存储单价为空，R2 存储成本按 0 计。');
   }
-  if (totalViewers === 0) out.push('普通/重度用户人数为空，CDN 流量成本按 0 计。');
-  if (totalViewers > 0 && (v.regularMinutesPerViewer + v.heavyMinutesPerViewer === 0)) {
+  if (totalViewers === 0) out.push('基础/高级会员人数为空，CDN 流量成本按 0 计。');
+  if (totalViewers > 0 && (v.basicMinutesPerViewer + v.premiumMinutesPerViewer === 0)) {
     out.push('人均观影分钟数为空，CDN 流量成本按 0 计。');
   }
-  if (v.regularPerMinMbLow > 0 && v.regularPerMinMbHigh > 0 && v.regularPerMinMbLow > v.regularPerMinMbHigh) {
-    out.push('普通用户每分钟流量下限 J1 大于上限 K1，已自动交换后计算。');
+  if (v.basicPerMinMbLow > 0 && v.basicPerMinMbHigh > 0 && v.basicPerMinMbLow > v.basicPerMinMbHigh) {
+    out.push('基础会员每分钟流量下限 J1 大于上限 K1，已自动交换后计算。');
   }
-  if (v.heavyPerMinMbLow > 0 && v.heavyPerMinMbHigh > 0 && v.heavyPerMinMbLow > v.heavyPerMinMbHigh) {
-    out.push('重度用户每分钟流量下限 J2 大于上限 K2，已自动交换后计算。');
+  if (v.premiumPerMinMbLow > 0 && v.premiumPerMinMbHigh > 0 && v.premiumPerMinMbLow > v.premiumPerMinMbHigh) {
+    out.push('高级会员每分钟流量下限 J2 大于上限 K2，已自动交换后计算。');
   }
   if (totalViewers > subs && subs > 0) {
-    out.push(`普通+重度用户人数（${totalViewers}）超过订阅总人数（${subs}），请核对。`);
+    out.push(`基础+高级会员人数（${totalViewers}）超过订阅总人数（${subs}），请核对。`);
   }
   if (v.tier1Share === 1 && (v.cdnTier2PerTbCny > 0 || (v.cdnTier2Tiers?.length ?? 0) > 0)) {
     out.push('亚太一区占比 α = 100%，亚太二区单价未参与计费。');

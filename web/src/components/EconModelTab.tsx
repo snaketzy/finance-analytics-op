@@ -19,6 +19,7 @@ import {
 } from '../api';
 import { Card, CardHeader, Empty } from './Card';
 import { Button, Field, Input, Select } from './Field';
+import { Modal } from './Modal';
 import { Money } from './Money';
 import { formatCny, formatInt, formatRate } from '../lib/format';
 
@@ -59,20 +60,26 @@ type Draft = {
   cdnTier2ListPrices: string[];
   cdnTier2RenewPrices: string[];
   tier1SharePct: string;
-  regularViewers: string;
-  heavyViewers: string;
-  regularMinutesPerViewer: string;
-  heavyMinutesPerViewer: string;
-  regularPerMinMbLow: string;
-  heavyPerMinMbLow: string;
-  regularPerMinMbHigh: string;
-  heavyPerMinMbHigh: string;
-  monthlySubs: string;
-  monthlyPriceCny: string;
-  quarterlySubs: string;
-  quarterlyPriceCny: string;
-  yearlySubs: string;
-  yearlyPriceCny: string;
+  basicViewers: string;
+  premiumViewers: string;
+  basicMinutesPerViewer: string;
+  premiumMinutesPerViewer: string;
+  basicPerMinMbLow: string;
+  premiumPerMinMbLow: string;
+  basicPerMinMbHigh: string;
+  premiumPerMinMbHigh: string;
+  basicMonthlySubs: string;
+  basicMonthlyPriceCny: string;
+  basicQuarterlySubs: string;
+  basicQuarterlyPriceCny: string;
+  basicYearlySubs: string;
+  basicYearlyPriceCny: string;
+  premiumMonthlySubs: string;
+  premiumMonthlyPriceCny: string;
+  premiumQuarterlySubs: string;
+  premiumQuarterlyPriceCny: string;
+  premiumYearlySubs: string;
+  premiumYearlyPriceCny: string;
   viewerGrowthPct: string;
   subscriberGrowthPct: string;
   horizonMonths: string;
@@ -181,20 +188,26 @@ function toDraft(v: EconVars): Draft {
     cdnTier2ListPrices: packagesToPrices(v.cdnTier2Packages, 'listCny'),
     cdnTier2RenewPrices: packagesToPrices(v.cdnTier2Packages, 'renewCny'),
     tier1SharePct: pctStr(v.tier1Share),
-    regularViewers: numStr(v.regularViewers),
-    heavyViewers: numStr(v.heavyViewers),
-    regularMinutesPerViewer: numStr(v.regularMinutesPerViewer),
-    heavyMinutesPerViewer: numStr(v.heavyMinutesPerViewer),
-    regularPerMinMbLow: numStr(v.regularPerMinMbLow),
-    heavyPerMinMbLow: numStr(v.heavyPerMinMbLow),
-    regularPerMinMbHigh: numStr(v.regularPerMinMbHigh),
-    heavyPerMinMbHigh: numStr(v.heavyPerMinMbHigh),
-    monthlySubs: numStr(v.monthlySubs),
-    monthlyPriceCny: numStr(v.monthlyPriceCny),
-    quarterlySubs: numStr(v.quarterlySubs),
-    quarterlyPriceCny: numStr(v.quarterlyPriceCny),
-    yearlySubs: numStr(v.yearlySubs),
-    yearlyPriceCny: numStr(v.yearlyPriceCny),
+    basicViewers: numStr(v.basicViewers),
+    premiumViewers: numStr(v.premiumViewers),
+    basicMinutesPerViewer: numStr(v.basicMinutesPerViewer),
+    premiumMinutesPerViewer: numStr(v.premiumMinutesPerViewer),
+    basicPerMinMbLow: numStr(v.basicPerMinMbLow),
+    premiumPerMinMbLow: numStr(v.premiumPerMinMbLow),
+    basicPerMinMbHigh: numStr(v.basicPerMinMbHigh),
+    premiumPerMinMbHigh: numStr(v.premiumPerMinMbHigh),
+    basicMonthlySubs: numStr(v.basicMonthlySubs),
+    basicMonthlyPriceCny: numStr(v.basicMonthlyPriceCny),
+    basicQuarterlySubs: numStr(v.basicQuarterlySubs),
+    basicQuarterlyPriceCny: numStr(v.basicQuarterlyPriceCny),
+    basicYearlySubs: numStr(v.basicYearlySubs),
+    basicYearlyPriceCny: numStr(v.basicYearlyPriceCny),
+    premiumMonthlySubs: numStr(v.premiumMonthlySubs),
+    premiumMonthlyPriceCny: numStr(v.premiumMonthlyPriceCny),
+    premiumQuarterlySubs: numStr(v.premiumQuarterlySubs),
+    premiumQuarterlyPriceCny: numStr(v.premiumQuarterlyPriceCny),
+    premiumYearlySubs: numStr(v.premiumYearlySubs),
+    premiumYearlyPriceCny: numStr(v.premiumYearlyPriceCny),
     viewerGrowthPct: pctStr(v.viewerGrowth),
     subscriberGrowthPct: pctStr(v.subscriberGrowth),
     horizonMonths: String(v.horizonMonths ?? 24),
@@ -225,20 +238,26 @@ function draftToVars(d: Draft): EconVars {
     cdnTier1Packages: pkg1,
     cdnTier2Packages: pkg2,
     tier1Share: parsePct(d.tier1SharePct),
-    regularViewers: parseNum(d.regularViewers),
-    heavyViewers: parseNum(d.heavyViewers),
-    regularMinutesPerViewer: parseNum(d.regularMinutesPerViewer),
-    heavyMinutesPerViewer: parseNum(d.heavyMinutesPerViewer),
-    regularPerMinMbLow: parseNum(d.regularPerMinMbLow),
-    heavyPerMinMbLow: parseNum(d.heavyPerMinMbLow),
-    regularPerMinMbHigh: parseNum(d.regularPerMinMbHigh),
-    heavyPerMinMbHigh: parseNum(d.heavyPerMinMbHigh),
-    monthlySubs: parseNum(d.monthlySubs),
-    monthlyPriceCny: parseNum(d.monthlyPriceCny),
-    quarterlySubs: parseNum(d.quarterlySubs),
-    quarterlyPriceCny: parseNum(d.quarterlyPriceCny),
-    yearlySubs: parseNum(d.yearlySubs),
-    yearlyPriceCny: parseNum(d.yearlyPriceCny),
+    basicViewers: parseNum(d.basicViewers),
+    premiumViewers: parseNum(d.premiumViewers),
+    basicMinutesPerViewer: parseNum(d.basicMinutesPerViewer),
+    premiumMinutesPerViewer: parseNum(d.premiumMinutesPerViewer),
+    basicPerMinMbLow: parseNum(d.basicPerMinMbLow),
+    premiumPerMinMbLow: parseNum(d.premiumPerMinMbLow),
+    basicPerMinMbHigh: parseNum(d.basicPerMinMbHigh),
+    premiumPerMinMbHigh: parseNum(d.premiumPerMinMbHigh),
+    basicMonthlySubs: parseNum(d.basicMonthlySubs),
+    basicMonthlyPriceCny: parseNum(d.basicMonthlyPriceCny),
+    basicQuarterlySubs: parseNum(d.basicQuarterlySubs),
+    basicQuarterlyPriceCny: parseNum(d.basicQuarterlyPriceCny),
+    basicYearlySubs: parseNum(d.basicYearlySubs),
+    basicYearlyPriceCny: parseNum(d.basicYearlyPriceCny),
+    premiumMonthlySubs: parseNum(d.premiumMonthlySubs),
+    premiumMonthlyPriceCny: parseNum(d.premiumMonthlyPriceCny),
+    premiumQuarterlySubs: parseNum(d.premiumQuarterlySubs),
+    premiumQuarterlyPriceCny: parseNum(d.premiumQuarterlyPriceCny),
+    premiumYearlySubs: parseNum(d.premiumYearlySubs),
+    premiumYearlyPriceCny: parseNum(d.premiumYearlyPriceCny),
     viewerGrowth: parsePct(d.viewerGrowthPct),
     subscriberGrowth: parsePct(d.subscriberGrowthPct),
     horizonMonths: parseNum(d.horizonMonths) ?? 24,
@@ -262,20 +281,26 @@ const EMPTY_VARS: EconVars = {
   cdnTier1Packages: null,
   cdnTier2Packages: null,
   tier1Share: null,
-  regularViewers: null,
-  heavyViewers: null,
-  regularMinutesPerViewer: null,
-  heavyMinutesPerViewer: null,
-  regularPerMinMbLow: null,
-  heavyPerMinMbLow: null,
-  regularPerMinMbHigh: null,
-  heavyPerMinMbHigh: null,
-  monthlySubs: null,
-  monthlyPriceCny: null,
-  quarterlySubs: null,
-  quarterlyPriceCny: null,
-  yearlySubs: null,
-  yearlyPriceCny: null,
+  basicViewers: null,
+  premiumViewers: null,
+  basicMinutesPerViewer: null,
+  premiumMinutesPerViewer: null,
+  basicPerMinMbLow: null,
+  premiumPerMinMbLow: null,
+  basicPerMinMbHigh: null,
+  premiumPerMinMbHigh: null,
+  basicMonthlySubs: null,
+  basicMonthlyPriceCny: null,
+  basicQuarterlySubs: null,
+  basicQuarterlyPriceCny: null,
+  basicYearlySubs: null,
+  basicYearlyPriceCny: null,
+  premiumMonthlySubs: null,
+  premiumMonthlyPriceCny: null,
+  premiumQuarterlySubs: null,
+  premiumQuarterlyPriceCny: null,
+  premiumYearlySubs: null,
+  premiumYearlyPriceCny: null,
   viewerGrowth: null,
   subscriberGrowth: null,
   horizonMonths: 24,
@@ -321,26 +346,38 @@ const GROUPS: { cn: string; en: string; fields: FieldDef[] }[] = [
     en: 'CDN Traffic',
     fields: [
       { key: 'tier1SharePct', label: 'α · 亚太一区占比', hint: '余下走二区', unit: '%', step: '0.1', placeholder: '如 80' },
-      { key: 'regularViewers', label: 'H1 · 普通用户月观看人数', hint: 'Regular Viewers', unit: '人', placeholder: '如 4000' },
-      { key: 'regularMinutesPerViewer', label: 'I1 · 普通用户人均月观影', hint: 'Min / Viewer', unit: '分钟', step: '1', placeholder: '如 480' },
-      { key: 'regularPerMinMbLow', label: 'J1 · 普通用户每分钟流量下限', hint: '乐观取下限', unit: 'MB', step: '0.1', placeholder: '如 10' },
-      { key: 'regularPerMinMbHigh', label: 'K1 · 普通用户每分钟流量上限', hint: '悲观取上限', unit: 'MB', step: '0.1', placeholder: '如 20' },
-      { key: 'heavyViewers', label: 'H2 · 重度用户月观看人数', hint: 'Heavy Viewers', unit: '人', placeholder: '如 1000' },
-      { key: 'heavyMinutesPerViewer', label: 'I2 · 重度用户人均月观影', hint: 'Min / Viewer', unit: '分钟', step: '1', placeholder: '如 1800' },
-      { key: 'heavyPerMinMbLow', label: 'J2 · 重度用户每分钟流量下限', hint: '乐观取下限', unit: 'MB', step: '0.1', placeholder: '如 14' },
-      { key: 'heavyPerMinMbHigh', label: 'K2 · 重度用户每分钟流量上限', hint: '悲观取上限', unit: 'MB', step: '0.1', placeholder: '如 25' },
+      { key: 'basicViewers', label: 'H1 · 基础会员月观看人数', hint: 'Regular Viewers', unit: '人', placeholder: '如 4000' },
+      { key: 'basicMinutesPerViewer', label: 'I1 · 基础会员人均月观影', hint: 'Min / Viewer', unit: '分钟', step: '1', placeholder: '如 480' },
+      { key: 'basicPerMinMbLow', label: 'J1 · 基础会员每分钟流量下限', hint: '乐观取下限', unit: 'MB', step: '0.1', placeholder: '如 10' },
+      { key: 'basicPerMinMbHigh', label: 'K1 · 基础会员每分钟流量上限', hint: '悲观取上限', unit: 'MB', step: '0.1', placeholder: '如 20' },
+      { key: 'premiumViewers', label: 'H2 · 高级会员月观看人数', hint: 'Heavy Viewers', unit: '人', placeholder: '如 1000' },
+      { key: 'premiumMinutesPerViewer', label: 'I2 · 高级会员人均月观影', hint: 'Min / Viewer', unit: '分钟', step: '1', placeholder: '如 1800' },
+      { key: 'premiumPerMinMbLow', label: 'J2 · 高级会员每分钟流量下限', hint: '乐观取下限', unit: 'MB', step: '0.1', placeholder: '如 14' },
+      { key: 'premiumPerMinMbHigh', label: 'K2 · 高级会员每分钟流量上限', hint: '悲观取上限', unit: 'MB', step: '0.1', placeholder: '如 25' },
     ],
   },
   {
-    cn: '订阅收入（月度确认口径）',
-    en: 'Subscription Revenue',
+    cn: '订阅收入 · 基础会员（月度确认口径）',
+    en: 'Basic Subscription',
     fields: [
-      { key: 'monthlySubs', label: 'L1 · 月卡订阅人数', hint: 'Monthly', unit: '人', placeholder: '如 800' },
-      { key: 'monthlyPriceCny', label: 'M1 · 月卡单价', hint: '¥/月', unit: '¥', placeholder: '如 30' },
-      { key: 'quarterlySubs', label: 'L2 · 季卡订阅人数', hint: '实收 ×3', unit: '人', placeholder: '如 300' },
-      { key: 'quarterlyPriceCny', label: 'M2 · 季卡单价', hint: '¥/月 × 3', unit: '¥', placeholder: '如 25', mult: 3 },
-      { key: 'yearlySubs', label: 'L3 · 年卡订阅人数', hint: '实收 ×12', unit: '人', placeholder: '如 200' },
-      { key: 'yearlyPriceCny', label: 'M3 · 年卡单价', hint: '¥/月 × 12', unit: '¥', placeholder: '如 20', mult: 12 },
+      { key: 'basicMonthlySubs', label: 'L1 · 月卡人数', hint: 'Basic · Monthly', unit: '人', placeholder: '如 800' },
+      { key: 'basicMonthlyPriceCny', label: 'M1 · 月卡单价', hint: 'Basic · ¥/月', unit: '¥', placeholder: '如 30' },
+      { key: 'basicQuarterlySubs', label: 'L2 · 季卡人数', hint: '实收 ×3', unit: '人', placeholder: '如 300' },
+      { key: 'basicQuarterlyPriceCny', label: 'M2 · 季卡单价', hint: '¥/月 × 3', unit: '¥', placeholder: '如 25', mult: 3 },
+      { key: 'basicYearlySubs', label: 'L3 · 年卡人数', hint: '实收 ×12', unit: '人', placeholder: '如 200' },
+      { key: 'basicYearlyPriceCny', label: 'M3 · 年卡单价', hint: '¥/月 × 12', unit: '¥', placeholder: '如 20', mult: 12 },
+    ],
+  },
+  {
+    cn: '订阅收入 · 高级会员（月度确认口径）',
+    en: 'Premium Subscription',
+    fields: [
+      { key: 'premiumMonthlySubs', label: 'L4 · 月卡人数', hint: 'Premium · Monthly', unit: '人', placeholder: '如 300' },
+      { key: 'premiumMonthlyPriceCny', label: 'M4 · 月卡单价', hint: 'Premium · ¥/月', unit: '¥', placeholder: '如 68' },
+      { key: 'premiumQuarterlySubs', label: 'L5 · 季卡人数', hint: '实收 ×3', unit: '人', placeholder: '如 120' },
+      { key: 'premiumQuarterlyPriceCny', label: 'M5 · 季卡单价', hint: '¥/月 × 3', unit: '¥', placeholder: '如 58', mult: 3 },
+      { key: 'premiumYearlySubs', label: 'L6 · 年卡人数', hint: '实收 ×12', unit: '人', placeholder: '如 80' },
+      { key: 'premiumYearlyPriceCny', label: 'M6 · 年卡单价', hint: '¥/月 × 12', unit: '¥', placeholder: '如 48', mult: 12 },
     ],
   },
   {
@@ -536,6 +573,7 @@ export default function EconModelTab({ productId, fxRate }: { productId: number;
   const [error, setError] = useState<string | null>(null);
   const [savedAt, setSavedAt] = useState<string | null>(null);
   const [loadedId, setLoadedId] = useState<number | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<{ id: number; when: string } | null>(null);
 
   const initedRef = useRef<number | null>(null);
   useEffect(() => {
@@ -620,10 +658,17 @@ export default function EconModelTab({ productId, fxRate }: { productId: number;
     }
   }
 
-  /** 删除某一历史版本快照（当前选中版本不提供删除入口）。 */
-  async function handleDeleteSnapshot(snapshotId: number) {
+  /** 打开删除确认弹窗。 */
+  function handleDeleteSnapshot(snapshotId: number) {
     const when = fmtSavedAt(history?.snapshots.find((s) => s.id === snapshotId)?.savedAt ?? null);
-    if (!window.confirm(`确认删除历史版本「${when}」的测算假设？删除后不可恢复。`)) return;
+    setPendingDelete({ id: snapshotId, when });
+  }
+
+  /** 确认删除某一历史版本快照。 */
+  async function confirmDelete() {
+    if (!pendingDelete) return;
+    const snapshotId = pendingDelete.id;
+    setPendingDelete(null);
     setError(null);
     try {
       await deleteSnapshot({ productId, snapshotId }).unwrap();
@@ -642,13 +687,13 @@ export default function EconModelTab({ productId, fxRate }: { productId: number;
   if (isLoading && !model) return <Empty text="加载全变量测算…" />;
   if (!model || !neutral) return <Empty text="暂无变量数据" />;
 
-  // CDN 消耗流量区间：普通 + 重度两组各自 人数 × 人均分钟 × 每分钟MB（上限取 K、下限取 J），求和后 ÷ (1024×1000) 换算 TB
-  const regMb = mbRange(vars.regularPerMinMbLow, vars.regularPerMinMbHigh);
-  const hvMb = mbRange(vars.heavyPerMinMbLow, vars.heavyPerMinMbHigh);
-  const regBase = (vars.regularViewers ?? 0) * (vars.regularMinutesPerViewer ?? 0);
-  const hvBase = (vars.heavyViewers ?? 0) * (vars.heavyMinutesPerViewer ?? 0);
-  const trafficLowTb = (regBase * regMb.low + hvBase * hvMb.low) / (1024 * 1000);
-  const trafficHighTb = (regBase * regMb.high + hvBase * hvMb.high) / (1024 * 1000);
+  // CDN 消耗流量区间：基础 + 高级两组各自 人数 × 人均分钟 × 每分钟MB（上限取 K、下限取 J），求和后 ÷ (1024×1000) 换算 TB
+  const basicMb = mbRange(vars.basicPerMinMbLow, vars.basicPerMinMbHigh);
+  const premiumMb = mbRange(vars.premiumPerMinMbLow, vars.premiumPerMinMbHigh);
+  const basicBase = (vars.basicViewers ?? 0) * (vars.basicMinutesPerViewer ?? 0);
+  const premiumBase = (vars.premiumViewers ?? 0) * (vars.premiumMinutesPerViewer ?? 0);
+  const trafficLowTb = (basicBase * basicMb.low + premiumBase * premiumMb.low) / (1024 * 1000);
+  const trafficHighTb = (basicBase * basicMb.high + premiumBase * premiumMb.high) / (1024 * 1000);
 
   const curves = SCEN.map((s) => model.curves[s.key]);
   const sharedMaxX = Math.max(...curves.map((c) => c.maxViewers), 1);
@@ -789,7 +834,7 @@ export default function EconModelTab({ productId, fxRate }: { productId: number;
           <div className="mt-0.5 text-[11px] text-slate-500">
             {neutral.negativeUnitEconomics
               ? '单位经济为负：人均收入 < 流量成本'
-              : `当前 ${formatInt((vars.regularViewers ?? 0) + (vars.heavyViewers ?? 0))} 人 · 安全边际 ${
+              : `当前 ${formatInt((vars.basicViewers ?? 0) + (vars.premiumViewers ?? 0))} 人 · 安全边际 ${
                   neutral.safetyMargin == null ? '—' : `${formatRate(neutral.safetyMargin * 100, 0)}%`
                 }`}
           </div>
@@ -1201,6 +1246,28 @@ export default function EconModelTab({ productId, fxRate }: { productId: number;
           </ul>
         </Card>
       ) : null}
+
+      {/* 删除历史版本确认弹窗 */}
+      <Modal
+        open={pendingDelete != null}
+        title="确认删除历史版本"
+        onClose={() => setPendingDelete(null)}
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setPendingDelete(null)}>
+              取消
+            </Button>
+            <Button variant="danger" onClick={confirmDelete}>
+              确认删除
+            </Button>
+          </>
+        }
+      >
+        <p className="text-sm text-slate-300">
+          确认删除历史版本「<span className="font-medium text-slate-100">{pendingDelete?.when}</span>」的测算假设？
+        </p>
+        <p className="mt-2 text-xs text-rose-400/90">删除后不可恢复。</p>
+      </Modal>
     </div>
   );
 }

@@ -968,34 +968,46 @@ export type EconVars = {
   cdnTier2Packages: CdnPackage[] | null;
   /** α 亚太一区流量占比 0-1 */
   tier1Share: number | null;
-  /** H1 普通用户月观看人数 */
-  regularViewers: number | null;
-  /** H2 重度用户月观看人数 */
-  heavyViewers: number | null;
-  /** I1 普通用户人均月观影分钟数 分钟 */
-  regularMinutesPerViewer: number | null;
-  /** I2 重度用户人均月观影分钟数 分钟 */
-  heavyMinutesPerViewer: number | null;
-  /** J1 普通用户每分钟流量下限 MB */
-  regularPerMinMbLow: number | null;
-  /** J2 重度用户每分钟流量下限 MB */
-  heavyPerMinMbLow: number | null;
-  /** K1 普通用户每分钟流量上限 MB */
-  regularPerMinMbHigh: number | null;
-  /** K2 重度用户每分钟流量上限 MB */
-  heavyPerMinMbHigh: number | null;
-  /** L1 月卡订阅人数 */
-  monthlySubs: number | null;
-  /** M1 月卡 ¥/月 */
-  monthlyPriceCny: number | null;
-  /** L2 季卡订阅人数 */
-  quarterlySubs: number | null;
-  /** M2 季卡 ¥/月（实收 = ×3） */
-  quarterlyPriceCny: number | null;
-  /** L3 年卡订阅人数 */
-  yearlySubs: number | null;
-  /** M3 年卡 ¥/月（实收 = ×12） */
-  yearlyPriceCny: number | null;
+  /** H1 基础会员月观看人数 人 */
+  basicViewers: number | null;
+  /** H2 高级会员月观看人数 人 */
+  premiumViewers: number | null;
+  /** I1 基础会员人均月观影分钟数 分钟 */
+  basicMinutesPerViewer: number | null;
+  /** I2 高级会员人均月观影分钟数 分钟 */
+  premiumMinutesPerViewer: number | null;
+  /** J1 基础会员每分钟流量下限 MB */
+  basicPerMinMbLow: number | null;
+  /** J2 高级会员每分钟流量下限 MB */
+  premiumPerMinMbLow: number | null;
+  /** K1 基础会员每分钟流量上限 MB */
+  basicPerMinMbHigh: number | null;
+  /** K2 高级会员每分钟流量上限 MB */
+  premiumPerMinMbHigh: number | null;
+  /** L1 基础会员 · 月卡订阅人数 */
+  basicMonthlySubs: number | null;
+  /** M1 基础会员 · 月卡 ¥/月 */
+  basicMonthlyPriceCny: number | null;
+  /** L2 基础会员 · 季卡订阅人数（实收 ×3） */
+  basicQuarterlySubs: number | null;
+  /** M2 基础会员 · 季卡 ¥/月（实收 = ×3） */
+  basicQuarterlyPriceCny: number | null;
+  /** L3 基础会员 · 年卡订阅人数（实收 ×12） */
+  basicYearlySubs: number | null;
+  /** M3 基础会员 · 年卡 ¥/月（实收 = ×12） */
+  basicYearlyPriceCny: number | null;
+  /** L4 高级会员 · 月卡订阅人数 */
+  premiumMonthlySubs: number | null;
+  /** M4 高级会员 · 月卡 ¥/月 */
+  premiumMonthlyPriceCny: number | null;
+  /** L5 高级会员 · 季卡订阅人数（实收 ×3） */
+  premiumQuarterlySubs: number | null;
+  /** M5 高级会员 · 季卡 ¥/月（实收 = ×3） */
+  premiumQuarterlyPriceCny: number | null;
+  /** L6 高级会员 · 年卡订阅人数（实收 ×12） */
+  premiumYearlySubs: number | null;
+  /** M6 高级会员 · 年卡 ¥/月（实收 = ×12） */
+  premiumYearlyPriceCny: number | null;
   /** 观看人数月净增长率 0-1 */
   viewerGrowth: number | null;
   /** 订阅人数月净增长率 0-1 */
@@ -1125,7 +1137,7 @@ export type EconSnapshot = {
   costCny: number;
   netCny: number;
   viewers: number | null;
-  monthlySubs: number | null;
+  subscribers: number | null;
 };
 
 export type EconSnapshotList = {

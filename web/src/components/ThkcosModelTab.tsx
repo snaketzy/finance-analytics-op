@@ -20,6 +20,7 @@ import {
 } from '../api';
 import { Card, CardHeader, Empty } from './Card';
 import { Button, Field, Input, Select } from './Field';
+import { Modal } from './Modal';
 import { Money } from './Money';
 import { formatCny, formatInt, formatRate } from '../lib/format';
 
@@ -579,6 +580,7 @@ export default function ThkcosModelTab({ productId, fxRate }: { productId: numbe
   const [error, setError] = useState<string | null>(null);
   const [savedAt, setSavedAt] = useState<string | null>(null);
   const [loadedId, setLoadedId] = useState<number | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<{ id: number; when: string } | null>(null);
 
   const initedRef = useRef<number | null>(null);
   useEffect(() => {
@@ -649,10 +651,17 @@ export default function ThkcosModelTab({ productId, fxRate }: { productId: numbe
     }
   }
 
-  /** 删除某一历史版本快照（当前选中版本不提供删除入口）。 */
-  async function handleDeleteSnapshot(snapshotId: number) {
+  /** 打开删除确认弹窗。 */
+  function handleDeleteSnapshot(snapshotId: number) {
     const when = fmtSavedAt(history?.snapshots.find((s) => s.id === snapshotId)?.savedAt ?? null);
-    if (!window.confirm(`确认删除历史版本「${when}」的测算假设？删除后不可恢复。`)) return;
+    setPendingDelete({ id: snapshotId, when });
+  }
+
+  /** 确认删除某一历史版本快照。 */
+  async function confirmDelete() {
+    if (!pendingDelete) return;
+    const snapshotId = pendingDelete.id;
+    setPendingDelete(null);
     setError(null);
     try {
       await deleteSnapshot({ productId, snapshotId }).unwrap();
@@ -1331,6 +1340,28 @@ export default function ThkcosModelTab({ productId, fxRate }: { productId: numbe
           </ul>
         </Card>
       ) : null}
+
+      {/* 删除历史版本确认弹窗 */}
+      <Modal
+        open={pendingDelete != null}
+        title="确认删除历史版本"
+        onClose={() => setPendingDelete(null)}
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setPendingDelete(null)}>
+              取消
+            </Button>
+            <Button variant="danger" onClick={confirmDelete}>
+              确认删除
+            </Button>
+          </>
+        }
+      >
+        <p className="text-sm text-slate-300">
+          确认删除历史版本「<span className="font-medium text-slate-100">{pendingDelete?.when}</span>」的测算假设？
+        </p>
+        <p className="mt-2 text-xs text-rose-400/90">删除后不可恢复。</p>
+      </Modal>
     </div>
   );
 }
