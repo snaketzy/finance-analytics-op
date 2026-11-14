@@ -17,6 +17,7 @@ import analyticsRoutes from './routes/analytics';
 import cloudflareBillingRoutes from './routes/cloudflare-billing';
 import paymentsRoutes from './routes/payments';
 import unitEconomicsRoutes from './routes/unit-economics';
+import unitEconomicsThkcosRoutes from './routes/unit-economics-thkcos';
 import productsRoutes from './routes/products';
 
 export async function buildApp(): Promise<FastifyInstance> {
@@ -42,6 +43,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   await app.register(cloudflareBillingRoutes, { prefix: '/api/cloudflare-billing' });
   await app.register(paymentsRoutes, { prefix: '/api/payments' });
   await app.register(unitEconomicsRoutes, { prefix: '/api/unit-economics' });
+  await app.register(unitEconomicsThkcosRoutes, { prefix: '/api/unit-economics' });
   await app.register(productsRoutes, { prefix: '/api/products' });
 
   startRepoSyncScheduler();

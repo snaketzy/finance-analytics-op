@@ -16,6 +16,7 @@ import {
 } from '../api';
 import { Card, CardHeader, Empty, PageHeader } from '../components/Card';
 import EconModelTab from '../components/EconModelTab';
+import ThkcosModelTab from '../components/ThkcosModelTab';
 import PlatformPricingTab from '../components/PlatformPricingTab';
 import { Button, Field, Input, Select } from '../components/Field';
 import { Money } from '../components/Money';
@@ -267,7 +268,7 @@ export default function UnitEconomics() {
   const [simulate] = useSimulateUnitEconomicsMutation();
   const [saveInputs, { isLoading: saving }] = useSaveUnitEconomicsInputsMutation();
 
-  const [tab, setTab] = useState<'overview' | 'econ' | 'pricing'>('overview');
+  const [tab, setTab] = useState<'overview' | 'econ' | 'thkcos' | 'pricing'>('overview');
   const [editable, setEditable] = useState<Record<ScenarioKey, Editable>>(emptyEditable);
   const [active, setActive] = useState<ScenarioKey>('neutral');
   const [sim, setSim] = useState<UESimulateResult | null>(null);
@@ -428,7 +429,8 @@ export default function UnitEconomics() {
               {(
                 [
                   { key: 'overview', en: 'Model Overview', cn: '模型概览' },
-                  { key: 'econ', en: 'All Variables', cn: '全变量测算' },
+                  { key: 'econ', en: 'All Variables', cn: 'cf&cdn全变量测算' },
+                  { key: 'thkcos', en: 'All Variables (COS)', cn: 'cf&THKCOS全变量测算' },
                   { key: 'pricing', en: 'Platform Pricing', cn: '平台资费' },
                 ] as const
               ).map((item) => (
@@ -449,6 +451,8 @@ export default function UnitEconomics() {
 
             {tab === 'econ' ? (
               <EconModelTab productId={detail.product.id} fxRate={detail.fxRate} />
+            ) : tab === 'thkcos' ? (
+              <ThkcosModelTab productId={detail.product.id} fxRate={detail.fxRate} />
             ) : tab === 'pricing' ? (
               <PlatformPricingTab fxRate={detail.fxRate} />
             ) : (

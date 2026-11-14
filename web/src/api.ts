@@ -1123,6 +1123,202 @@ export type EconSnapshotList = {
   snapshots: EconSnapshot[];
 };
 
+/* ------------------- cf & THKCOS 全变量测算（thkcos-vars） ------------------- */
+
+/** 流量计价模式：direct = 直连 COS 外网下行，cdn = 经 CDN（边缘下行 + COS 回源）。 */
+export type ThkcosTrafficMode = 'direct' | 'cdn';
+
+/** 情景键：悲观取单片流量上限 K、乐观取下限 J。 */
+export type ThkcosScenarioKey = 'pessimistic' | 'neutral' | 'optimistic';
+
+/** cf & THKCOS 全变量测算输入（NULL = 未填，计算时按 0 处理）。 */
+export type ThkcosVars = {
+  /** A 云主机月租 ¥/月 */
+  vultrMonthlyCny: number | null;
+  /** 域名年费 ¥/年 */
+  domainAnnualCny: number | null;
+  /** SSL 证书年费 ¥/年 */
+  sslAnnualCny: number | null;
+  /** B R2 每 GB 月存储单价 ¥/GB */
+  r2StoragePerGbCny: number | null;
+  /** C 腾讯云 COS 每 GB 月存储单价 ¥/GB */
+  cosStoragePerGbCny: number | null;
+  /** D 片库影片数 部 */
+  libraryTitles: number | null;
+  /** E 单片平均体积 GB */
+  avgTitleGb: number | null;
+  /** F 每月增量同步数据量 GB/月（R2 → COS） */
+  syncGbPerMonth: number | null;
+  /** G 同步入口流量单价 ¥/GB */
+  syncPerGbCny: number | null;
+  /** 流量计价模式（空 = direct） */
+  trafficMode: ThkcosTrafficMode | null;
+  /** H 月观看人数 人 */
+  viewers: number | null;
+  /** I 人均月观看部数 */
+  titlesPerViewer: number | null;
+  /** J 单片流量下限 GB */
+  perTitleGbLow: number | null;
+  /** K 单片流量上限 GB */
+  perTitleGbHigh: number | null;
+  /** λ CDN 缓存命中率 0-1（仅 cdn 模式） */
+  cacheHitRatio: number | null;
+  /** 直连：COS 外网下行阶梯（固定 5 档） */
+  cosDownTiers: CdnTier[] | null;
+  /** 经 EO：套餐外超量阶梯（固定 5 档，¥/TB） */
+  eoOverageTiers: CdnTier[] | null;
+  /** 经 EO：COS 回源阶梯（固定 5 档） */
+  cosOriginTiers: CdnTier[] | null;
+  /** 计费口径：tiered = 超量阶梯累进，package = 预付费流量包（空 = tiered） */
+  cdnPricingMode: CdnPricingMode | null;
+  /** 资源包价格档（空 = renew） */
+  cdnPackagePrice: CdnPackagePrice | null;
+  /** 直连：COS 外网下行资源包（固定 6 档） */
+  cosDownPackages: CdnPackage[] | null;
+  /** 经 EO：全球流量包（固定 6 档，按地区抵扣系数换算） */
+  eoPackages: CdnPackage[] | null;
+  /** EO 套餐月费 ¥/月 */
+  eoPlanMonthlyCny: number | null;
+  /** EO 套餐内含流量 GB/月 */
+  eoPlanIncludedGb: number | null;
+  /** EO 流量包地区抵扣系数（亚太1区 = 2.49） */
+  eoDeductionRatio: number | null;
+  /** L1 月卡订阅人数 */
+  monthlySubs: number | null;
+  /** M1 月卡 ¥/月 */
+  monthlyPriceCny: number | null;
+  /** L2 季卡订阅人数 */
+  quarterlySubs: number | null;
+  /** M2 季卡 ¥/月（实收 = ×3） */
+  quarterlyPriceCny: number | null;
+  /** L3 年卡订阅人数 */
+  yearlySubs: number | null;
+  /** M3 年卡 ¥/月（实收 = ×12） */
+  yearlyPriceCny: number | null;
+  /** 观看人数月净增长率 0-1 */
+  viewerGrowth: number | null;
+  /** 订阅人数月净增长率 0-1 */
+  subscriberGrowth: number | null;
+  /** 推演月数 */
+  horizonMonths: number;
+};
+
+export type ThkcosCostItem = {
+  key: string;
+  labelCn: string;
+  labelEn: string;
+  cny: number;
+  group: 'fixed' | 'storage' | 'sync' | 'traffic';
+  share: number;
+};
+
+export type ThkcosMetrics = {
+  scenario: ThkcosScenarioKey;
+  gbPerTitle: number;
+  domainMonthlyCny: number;
+  sslMonthlyCny: number;
+  r2StorageMonthlyCny: number;
+  cosStorageMonthlyCny: number;
+  storageMonthlyCny: number;
+  syncMonthlyCny: number;
+  baseFixedCny: number;
+  trafficGb: number;
+  trafficTb: number;
+  blendedPerTbCny: number;
+  trafficCny: number;
+  totalCostCny: number;
+  revenueCny: number;
+  netCny: number;
+  netMargin: number | null;
+  trafficPerViewerCny: number;
+  trafficPerTitleCny: number;
+  perViewerRevenueCny: number | null;
+  perViewerCostCny: number | null;
+  breakEvenViewers: number | null;
+  breakEvenTitles: number | null;
+  safetyMargin: number | null;
+  negativeUnitEconomics: boolean;
+  costs: ThkcosCostItem[];
+};
+
+export type ThkcosCurvePoint = {
+  viewers: number;
+  revenueCny: number;
+  totalCostCny: number;
+  fixedCny: number;
+  netCny: number;
+};
+
+export type ThkcosCurve = {
+  scenario: ThkcosScenarioKey;
+  points: ThkcosCurvePoint[];
+  maxViewers: number;
+  currentViewers: number;
+  breakEvenViewers: number | null;
+};
+
+export type ThkcosProjectionPoint = {
+  monthIndex: number;
+  ym: string;
+  viewers: number;
+  subscribers: number;
+  revenueCny: number;
+  totalCostCny: number;
+  netCny: number;
+  cumNetCny: number;
+};
+
+export type ThkcosProjection = {
+  scenario: ThkcosScenarioKey;
+  points: ThkcosProjectionPoint[];
+  breakEvenMonth: number | null;
+  paybackMonth: number | null;
+  endNetCny: number | null;
+  endCumNetCny: number | null;
+};
+
+export type ThkcosSensitivityRow = {
+  key: string;
+  labelCn: string;
+  labelEn: string;
+  baseValue: number;
+  impact: number;
+};
+
+export type ThkcosModel = {
+  vars: ThkcosVars;
+  results: Record<ThkcosScenarioKey, ThkcosMetrics>;
+  curves: Record<ThkcosScenarioKey, ThkcosCurve>;
+  projections: Record<ThkcosScenarioKey, ThkcosProjection>;
+  sensitivity: Record<ThkcosScenarioKey, ThkcosSensitivityRow[]>;
+  warnings: string[];
+};
+
+export type ThkcosPayload = ThkcosModel & {
+  fxRate: number | null;
+  productId: number;
+  stored: boolean;
+  snapshotId: number | null;
+  savedAt: string | null;
+  reference: EconReference;
+};
+
+/** THKCOS 全变量历史快照（含保存日期与关键结论，用于速览对比）。 */
+export type ThkcosSnapshot = {
+  id: number;
+  savedAt: string;
+  revenueCny: number;
+  costCny: number;
+  netCny: number;
+  viewers: number | null;
+  monthlySubs: number | null;
+};
+
+export type ThkcosSnapshotList = {
+  fxRate: number | null;
+  snapshots: ThkcosSnapshot[];
+};
+
 export type CloudflareUsageItem = {
   sourceKey: string;
   family: string;
@@ -1840,6 +2036,54 @@ export const api = createApi({
       }),
       invalidatesTags: ['UnitEconomics'],
     }),
+
+    /* ------------------- cf & THKCOS 全变量测算（thkcos-vars） ------------------- */
+
+    /** 读取 THKCOS 全变量测算（无记录时按实际流水初始化 Vultr 月租）。 */
+    getUnitEconomicsThkcosVars: builder.query<ThkcosPayload, number>({
+      query: (productId) => `/unit-economics/${productId}/thkcos-vars`,
+      providesTags: ['UnitEconomics'],
+    }),
+
+    /** THKCOS 全变量实时模拟：不落库，按提交变量重算（用于输入即时联动）。 */
+    simulateUnitEconomicsThkcosVars: builder.mutation<ThkcosPayload, { productId: number; vars: Partial<ThkcosVars> }>({
+      query: ({ productId, vars }) => ({
+        url: `/unit-economics/${productId}/thkcos-vars/simulate`,
+        method: 'POST',
+        body: { vars },
+      }),
+    }),
+
+    /** 保存 THKCOS 全变量（按次新增一条带保存日期的历史快照）。 */
+    saveUnitEconomicsThkcosVars: builder.mutation<ThkcosPayload, { productId: number; vars: Partial<ThkcosVars> }>({
+      query: ({ productId, vars }) => ({
+        url: `/unit-economics/${productId}/thkcos-vars`,
+        method: 'PUT',
+        body: vars,
+      }),
+      invalidatesTags: ['UnitEconomics'],
+    }),
+
+    /** THKCOS 全变量历史快照列表（按保存日期倒序）。 */
+    getUnitEconomicsThkcosVarsSnapshots: builder.query<ThkcosSnapshotList, number>({
+      query: (productId) => `/unit-economics/${productId}/thkcos-vars/snapshots`,
+      providesTags: ['UnitEconomics'],
+    }),
+
+    /** 读取指定历史版本快照的完整测算（用于回溯查看）。 */
+    getUnitEconomicsThkcosVarsSnapshot: builder.query<ThkcosPayload, { productId: number; snapshotId: number }>({
+      query: ({ productId, snapshotId }) => `/unit-economics/${productId}/thkcos-vars/snapshots/${snapshotId}`,
+      providesTags: ['UnitEconomics'],
+    }),
+
+    /** 删除指定历史版本快照。 */
+    deleteUnitEconomicsThkcosVarsSnapshot: builder.mutation<{ deleted: number }, { productId: number; snapshotId: number }>({
+      query: ({ productId, snapshotId }) => ({
+        url: `/unit-economics/${productId}/thkcos-vars/snapshots/${snapshotId}`,
+        method: 'DELETE',
+      }),
+      invalidatesTags: ['UnitEconomics'],
+    }),
   }),
 });
 
@@ -1924,4 +2168,10 @@ export const {
   useGetUnitEconomicsEconVarsSnapshotsQuery,
   useLazyGetUnitEconomicsEconVarsSnapshotQuery,
   useDeleteUnitEconomicsEconVarsSnapshotMutation,
+  useGetUnitEconomicsThkcosVarsQuery,
+  useSimulateUnitEconomicsThkcosVarsMutation,
+  useSaveUnitEconomicsThkcosVarsMutation,
+  useGetUnitEconomicsThkcosVarsSnapshotsQuery,
+  useLazyGetUnitEconomicsThkcosVarsSnapshotQuery,
+  useDeleteUnitEconomicsThkcosVarsSnapshotMutation,
 } = api;
