@@ -4,16 +4,21 @@ import type { ReactNode } from 'react';
 export function PageHeader({
   en,
   cn,
+  titleExtra,
   children,
 }: {
   en: string;
   cn: string;
+  titleExtra?: ReactNode;
   children?: ReactNode;
 }) {
   return (
     <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
       <div className="leading-tight">
-        <h1 className="text-lg font-semibold text-slate-100">{en}</h1>
+        <div className="flex items-center gap-3">
+          <h1 className="text-lg font-semibold text-slate-100">{en}</h1>
+          {titleExtra}
+        </div>
         <p className="text-xs text-slate-500">{cn}</p>
       </div>
       {children}

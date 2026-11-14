@@ -54,7 +54,7 @@ type Draft = {
   /** CDN 计价模式与资源包价格档 */
   cdnPricingMode: CdnPricingMode;
   cdnPackagePrice: CdnPackagePrice;
-  /** 资源包 6 档价格（字符串，与 CDN_PACKAGE_BOUNDS 一一对应） */
+  /** 资源包 8 档价格（字符串，与 CDN_PACKAGE_BOUNDS 一一对应） */
   cdnTier1ListPrices: string[];
   cdnTier1RenewPrices: string[];
   cdnTier2ListPrices: string[];
@@ -130,10 +130,10 @@ function pricesToTiers(prices: string[]): CdnTier[] | null {
 }
 
 /* ------------------------------------------------------------------ */
-/* CDN 资源包：固定 6 档容量，可编辑「刊例价 / 续订价」两套价格             */
+/* CDN 资源包：预置 8 档容量，最大放宽至 1PB，可编辑「刊例价 / 续订价」两套价格 */
 /* ------------------------------------------------------------------ */
 
-/** 资源包档位容量（GB，与腾讯云「预付费流量包」一致）。 */
+/** 资源包档位容量（GB；前 6 档与腾讯云一致，额外补 200TB / 1PB 两档便于大盘测算）。 */
 const CDN_PACKAGE_BOUNDS: { sizeGb: number; label: string }[] = [
   { sizeGb: 100, label: '100 GB' },
   { sizeGb: 500, label: '500 GB' },
@@ -141,21 +141,23 @@ const CDN_PACKAGE_BOUNDS: { sizeGb: number; label: string }[] = [
   { sizeGb: 5000, label: '5 TB' },
   { sizeGb: 10000, label: '10 TB' },
   { sizeGb: 50000, label: '50 TB' },
+  { sizeGb: 200000, label: '200 TB' },
+  { sizeGb: 1000000, label: '1 PB' },
 ];
 
-/** 腾讯云 CDN 流量包价格（¥/包）：单次购买刊例价 / 连续包月自动续订价。 */
+/** 腾讯云 CDN 流量包价格（¥/包）：前 6 档为刊例价 / 连续包月自动续订价，200TB / 1PB 留空手填。 */
 const TENCENT_PACKAGE_PRICE = {
   tier1: {
-    list: ['46', '230', '460', '2150', '4200', '19000'],
-    renew: ['42.80', '209.00', '413.30', '1995.00', '3895.00', '17575.00'],
+    list: ['46', '230', '460', '2150', '4200', '19000', '', ''],
+    renew: ['42.80', '209.00', '413.30', '1995.00', '3895.00', '17575.00', '', ''],
   },
   tier2: {
-    list: ['55', '275', '550', '2630', '5180', '23980'],
-    renew: ['51.30', '228.00', '446.50', '2042.50', '3990.00', '19475.00'],
+    list: ['55', '275', '550', '2630', '5180', '23980', '', ''],
+    renew: ['51.30', '228.00', '446.50', '2042.50', '3990.00', '19475.00', '', ''],
   },
 };
 
-/** 资源包数组 → 6 个字符串价格（按 list / renew 取值，不足处补空）。 */
+/** 资源包数组 → 8 个字符串价格（按 list / renew 取值，不足处补空）。 */
 function packagesToPrices(pkgs: CdnPackage[] | null | undefined, key: 'listCny' | 'renewCny'): string[] {
   return CDN_PACKAGE_BOUNDS.map((_, i) => numStr(pkgs?.[i]?.[key]));
 }
@@ -990,7 +992,8 @@ export default function EconModelTab({ productId, fxRate }: { productId: number;
                         <>
                           <div className="flex flex-wrap items-center justify-between gap-2">
                             <span className="text-[11px] text-slate-400">
-                              F / G · 流量包价格（预付费资源包：按月覆盖流量的最省整包组合，上为刊例价 / 下为续订价）
+                              F / G · 流量包价格（预付费资源包：在 100GB / 500GB / 1TB / 5TB / 10TB / 50TB / 200TB / 1PB
+                              档位中按月选择最省整包组合，上为刊例价 / 下为续订价）
                             </span>
                             <Button size="sm" variant="ghost" onClick={applyTencentPackages}>
                               填入腾讯云资源包价

@@ -58,17 +58,19 @@ type Draft = {
   basicPerMinMbHigh: string;
   premiumPerMinMbHigh: string;
   cacheHitRatioPct: string;
-  /** 固定 5 档单价（字符串，与 TRAFFIC_TIER_BOUNDS 一一对应） */
-  cosDownPrices: string[];
+  /** 直连 COS 外网下行按量单价 ¥/GB（沿用现有阶梯字段存储）。 */
+  cosDownPerGbCny: string;
   eoOveragePrices: string[];
-  cosOriginPrices: string[];
-  /** 计费口径：tiered = 超量阶梯累进，package = 预付费流量包 */
+  /** 经 EO：COS 回源单价 ¥/GB（沿用现有字段存储）。 */
+  cosOriginPerGbCny: string;
+  /** 计费口径：tiered = 按量（直连按官方单价 / 经 EO 按超量阶梯），package = 预付费流量包 */
   cdnPricingMode: CdnPricingMode;
   /** 资源包价格档：renew = 续订价，list = 刊例价 */
   cdnPackagePrice: CdnPackagePrice;
-  /** 资源包 6 档价格（字符串，与 CDN_PACKAGE_BOUNDS 一一对应） */
+  /** COS 资源包 8 档价格（字符串，与 COS_PACKAGE_BOUNDS 一一对应） */
   cosDownListPrices: string[];
   cosDownRenewPrices: string[];
+  /** EO 资源包 11 档价格（字符串，与 EO_PACKAGE_BOUNDS 一一对应） */
   eoListPrices: string[];
   eoRenewPrices: string[];
   /** EO 套餐月费 ¥/月 */
@@ -108,55 +110,98 @@ const parsePct = (s: string): number | null => {
 };
 
 /* ------------------------------------------------------------------ */
-/* 流量阶梯：固定 5 档，仅单价可调（腾讯云「月度阶梯累进」口径）            */
+/* 流量计价：COS 直连按量单价；EO 超量固定 7 档，仅单价可调                */
 /* ------------------------------------------------------------------ */
 
-/** 档位边界（upToTb = null 表示无上限的末档）。 */
-const TRAFFIC_TIER_BOUNDS: { upToTb: number | null; label: string }[] = [
+const EO_OVERAGE_TIER_BOUNDS: { upToTb: number | null; label: string }[] = [
   { upToTb: 2, label: '0–2 TB' },
   { upToTb: 10, label: '2–10 TB' },
   { upToTb: 50, label: '10–50 TB' },
   { upToTb: 100, label: '50–100 TB' },
-  { upToTb: null, label: '≥100 TB' },
+  { upToTb: 500, label: '100–500 TB' },
+  { upToTb: 1000, label: '500–1000 TB' },
+  { upToTb: null, label: '≥1000 TB' },
 ];
 
-/** 阶梯数组 → 5 个字符串单价（不足处补空）。 */
-function tiersToPrices(tiers: CdnTier[] | null | undefined): string[] {
-  return TRAFFIC_TIER_BOUNDS.map((_, i) => numStr(tiers?.[i]?.pricePerTbCny));
+/** 阶梯数组 → 指定档位的字符串单价（不足处补空）。 */
+function tiersToPrices(tiers: CdnTier[] | null | undefined, bounds: { upToTb: number | null; label: string }[]): string[] {
+  return bounds.map((_, i) => numStr(tiers?.[i]?.pricePerTbCny));
 }
 
-/** 5 个字符串单价 → 阶梯数组（全空视为「未配置」，返回 null）。 */
-function pricesToTiers(prices: string[]): CdnTier[] | null {
+/** 指定档位的字符串单价 → 阶梯数组（全空视为「未配置」，返回 null）。 */
+function pricesToTiers(prices: string[], bounds: { upToTb: number | null; label: string }[]): CdnTier[] | null {
   const parsed = prices.map((p) => parseNum(p));
   if (parsed.every((p) => p === null)) return null;
-  return TRAFFIC_TIER_BOUNDS.map((b, i) => ({ upToTb: b.upToTb, pricePerTbCny: parsed[i] ?? 0 }));
+  return bounds.map((b, i) => ({ upToTb: b.upToTb, pricePerTbCny: parsed[i] ?? 0 }));
+}
+
+/** 单档单价：沿用现有阶梯字段，仅取首档并折算为 ¥/GB。 */
+function singleTierToPerGb(tiers: CdnTier[] | null | undefined): string {
+  const first = tiers?.[0]?.pricePerTbCny;
+  return first == null ? '' : numStr(first / 1000);
+}
+
+/** 单档单价：存储为单档等效 ¥/TB，兼容现有字段结构。 */
+function perGbToSingleTier(price: string): CdnTier[] | null {
+  const parsed = parseNum(price);
+  return parsed == null ? null : [{ upToTb: null, pricePerTbCny: parsed * 1000 }];
+}
+
+/** COS 回源单价：沿用现有阶梯字段，仅取首档并折算为 ¥/GB。 */
+function originTiersToPerGb(tiers: CdnTier[] | null | undefined): string {
+  const first = tiers?.[0]?.pricePerTbCny;
+  return first == null ? '' : numStr(first / 1000);
+}
+
+/** COS 回源单价：存储为单档等效 ¥/TB，兼容现有字段结构。 */
+function originPerGbToTiers(price: string): CdnTier[] | null {
+  const parsed = parseNum(price);
+  return parsed == null ? null : [{ upToTb: null, pricePerTbCny: parsed * 1000 }];
 }
 
 /* ------------------------------------------------------------------ */
-/* 流量资源包：固定 6 档容量，可编辑「刊例价 / 续订价」两套价格            */
+/* 流量资源包：COS 预置 8 档至 1PB；EO 预置 11 档至 50PB，可编辑「刊例价 / 续订价」 */
 /* ------------------------------------------------------------------ */
 
-/** 资源包档位容量（GB，与腾讯云「预付费流量包」一致）。 */
-const CDN_PACKAGE_BOUNDS: { sizeGb: number; label: string }[] = [
+/** COS 资源包档位容量（GB；前 6 档与腾讯云一致，额外补 200TB / 1PB 两档便于大盘测算）。 */
+const COS_PACKAGE_BOUNDS: { sizeGb: number; label: string }[] = [
   { sizeGb: 100, label: '100 GB' },
   { sizeGb: 500, label: '500 GB' },
   { sizeGb: 1000, label: '1 TB' },
   { sizeGb: 5000, label: '5 TB' },
   { sizeGb: 10000, label: '10 TB' },
   { sizeGb: 50000, label: '50 TB' },
+  { sizeGb: 200000, label: '200 TB' },
+  { sizeGb: 1000000, label: '1 PB' },
 ];
 
-/** 资源包数组 → 6 个字符串价格（按 list / renew 取值，不足处补空）。 */
-function packagesToPrices(pkgs: CdnPackage[] | null | undefined, key: 'listCny' | 'renewCny'): string[] {
-  return CDN_PACKAGE_BOUNDS.map((_, i) => numStr(pkgs?.[i]?.[key]));
+/** EO 全球流量包档位容量（GB；在 COS 基础上继续扩展 5PB / 10PB / 50PB）。 */
+const EO_PACKAGE_BOUNDS: { sizeGb: number; label: string }[] = [
+  ...COS_PACKAGE_BOUNDS,
+  { sizeGb: 5000000, label: '5 PB' },
+  { sizeGb: 10000000, label: '10 PB' },
+  { sizeGb: 50000000, label: '50 PB' },
+];
+
+/** 资源包数组 → 指定档位的字符串价格（按 list / renew 取值，不足处补空）。 */
+function packagesToPrices(
+  pkgs: CdnPackage[] | null | undefined,
+  bounds: { sizeGb: number; label: string }[],
+  key: 'listCny' | 'renewCny'
+): string[] {
+  return bounds.map((_, i) => numStr(pkgs?.[i]?.[key]));
 }
 
 /** 两套字符串价格 → 资源包数组（两套全空视为「未配置」，返回 null）。 */
-function pricesToPackages(list: string[], renew: string[]): CdnPackage[] | null {
+function pricesToPackages(
+  bounds: { sizeGb: number; label: string }[],
+  list: string[],
+  renew: string[]
+): CdnPackage[] | null {
   const l = list.map((p) => parseNum(p));
   const r = renew.map((p) => parseNum(p));
   if (l.every((p) => p === null) && r.every((p) => p === null)) return null;
-  return CDN_PACKAGE_BOUNDS.map((b, i) => ({ sizeGb: b.sizeGb, listCny: l[i] ?? 0, renewCny: r[i] ?? 0 }));
+  return bounds.map((b, i) => ({ sizeGb: b.sizeGb, listCny: l[i] ?? 0, renewCny: r[i] ?? 0 }));
 }
 
 function toDraft(v: ThkcosVars): Draft {
@@ -180,15 +225,15 @@ function toDraft(v: ThkcosVars): Draft {
     basicPerMinMbHigh: numStr(v.basicPerMinMbHigh),
     premiumPerMinMbHigh: numStr(v.premiumPerMinMbHigh),
     cacheHitRatioPct: pctStr(v.cacheHitRatio),
-    cosDownPrices: tiersToPrices(v.cosDownTiers),
-    eoOveragePrices: tiersToPrices(v.eoOverageTiers),
-    cosOriginPrices: tiersToPrices(v.cosOriginTiers),
+    cosDownPerGbCny: singleTierToPerGb(v.cosDownTiers),
+    eoOveragePrices: tiersToPrices(v.eoOverageTiers, EO_OVERAGE_TIER_BOUNDS),
+    cosOriginPerGbCny: originTiersToPerGb(v.cosOriginTiers),
     cdnPricingMode: v.cdnPricingMode ?? 'tiered',
     cdnPackagePrice: v.cdnPackagePrice ?? 'renew',
-    cosDownListPrices: packagesToPrices(v.cosDownPackages, 'listCny'),
-    cosDownRenewPrices: packagesToPrices(v.cosDownPackages, 'renewCny'),
-    eoListPrices: packagesToPrices(v.eoPackages, 'listCny'),
-    eoRenewPrices: packagesToPrices(v.eoPackages, 'renewCny'),
+    cosDownListPrices: packagesToPrices(v.cosDownPackages, COS_PACKAGE_BOUNDS, 'listCny'),
+    cosDownRenewPrices: packagesToPrices(v.cosDownPackages, COS_PACKAGE_BOUNDS, 'renewCny'),
+    eoListPrices: packagesToPrices(v.eoPackages, EO_PACKAGE_BOUNDS, 'listCny'),
+    eoRenewPrices: packagesToPrices(v.eoPackages, EO_PACKAGE_BOUNDS, 'renewCny'),
     eoPlanMonthlyCny: numStr(v.eoPlanMonthlyCny),
     eoPlanIncludedGb: numStr(v.eoPlanIncludedGb),
     eoDeductionRatio: numStr(v.eoDeductionRatio),
@@ -232,13 +277,13 @@ function draftToVars(d: Draft): ThkcosVars {
     basicPerMinMbHigh: parseNum(d.basicPerMinMbHigh),
     premiumPerMinMbHigh: parseNum(d.premiumPerMinMbHigh),
     cacheHitRatio: parsePct(d.cacheHitRatioPct),
-    cosDownTiers: pricesToTiers(d.cosDownPrices),
-    eoOverageTiers: pricesToTiers(d.eoOveragePrices),
-    cosOriginTiers: pricesToTiers(d.cosOriginPrices),
+    cosDownTiers: perGbToSingleTier(d.cosDownPerGbCny),
+    eoOverageTiers: pricesToTiers(d.eoOveragePrices, EO_OVERAGE_TIER_BOUNDS),
+    cosOriginTiers: originPerGbToTiers(d.cosOriginPerGbCny),
     cdnPricingMode: d.cdnPricingMode,
     cdnPackagePrice: d.cdnPackagePrice,
-    cosDownPackages: pricesToPackages(d.cosDownListPrices, d.cosDownRenewPrices),
-    eoPackages: pricesToPackages(d.eoListPrices, d.eoRenewPrices),
+    cosDownPackages: pricesToPackages(COS_PACKAGE_BOUNDS, d.cosDownListPrices, d.cosDownRenewPrices),
+    eoPackages: pricesToPackages(EO_PACKAGE_BOUNDS, d.eoListPrices, d.eoRenewPrices),
     eoPlanMonthlyCny: parseNum(d.eoPlanMonthlyCny),
     eoPlanIncludedGb: parseNum(d.eoPlanIncludedGb),
     eoDeductionRatio: parseNum(d.eoDeductionRatio),
@@ -614,8 +659,8 @@ export default function ThkcosModelTab({ productId, fxRate }: { productId: numbe
   const set = (key: keyof Draft, value: string) =>
     setDraft((d) => ({ ...d, [key]: value }) as Draft);
 
-  /** 修改某一档的流量单价。 */
-  const setTierPrice = (key: 'cosDownPrices' | 'eoOveragePrices' | 'cosOriginPrices', index: number, value: string) =>
+  /** 修改 EO 超量某一档的单价。 */
+  const setTierPrice = (key: 'eoOveragePrices', index: number, value: string) =>
     setDraft((d) => ({ ...d, [key]: d[key].map((p, i) => (i === index ? value : p)) }));
 
   /** 修改资源包某一档的价格（list = 刊例价 / renew = 续订价）。 */
@@ -723,24 +768,28 @@ export default function ThkcosModelTab({ productId, fxRate }: { productId: numbe
   const sensMax = Math.max(...sensRows.map((r) => r.impact), 1);
 
   /** 当前模式下的阶梯编辑器行。 */
-  const tierRows: { key: 'cosDownPrices' | 'eoOveragePrices' | 'cosOriginPrices'; label: string; hint: string }[] = isCdn
-    ? [
-        { key: 'eoOveragePrices', label: 'EO 超量阶梯', hint: 'Overage Tiered' },
-        { key: 'cosOriginPrices', label: 'COS 回源阶梯', hint: 'Origin Pull' },
-      ]
-    : [{ key: 'cosDownPrices', label: 'COS 外网下行阶梯', hint: 'COS Egress' }];
+  const tierRows: {
+    key: 'eoOveragePrices';
+    label: string;
+    hint: string;
+    bounds: { upToTb: number | null; label: string }[];
+  }[] = isCdn
+    ? [{ key: 'eoOveragePrices', label: 'EO 超量阶梯', hint: 'Overage Tiered', bounds: EO_OVERAGE_TIER_BOUNDS }]
+    : [];
 
   const isPackage = draft.cdnPricingMode === 'package';
+  const topControlCount = 2 + (isCdn ? 1 : 0) + (isPackage ? 1 : 0);
 
-  /** 当前模式下的资源包编辑器行（回源始终按量阶梯累进，不参与资源包）。 */
+  /** 当前模式下的资源包编辑器行（回源始终按单价计费，不参与资源包）。 */
   const packageRows: {
     listKey: 'cosDownListPrices' | 'eoListPrices';
     renewKey: 'cosDownRenewPrices' | 'eoRenewPrices';
     label: string;
     hint: string;
+    bounds: { sizeGb: number; label: string }[];
   }[] = isCdn
-    ? [{ listKey: 'eoListPrices', renewKey: 'eoRenewPrices', label: 'EO 全球流量包', hint: 'Global Package' }]
-    : [{ listKey: 'cosDownListPrices', renewKey: 'cosDownRenewPrices', label: 'COS 外网下行资源包', hint: 'COS Egress' }];
+    ? [{ listKey: 'eoListPrices', renewKey: 'eoRenewPrices', label: 'EO 全球流量包', hint: 'Global Package', bounds: EO_PACKAGE_BOUNDS }]
+    : [{ listKey: 'cosDownListPrices', renewKey: 'cosDownRenewPrices', label: 'COS 外网下行资源包', hint: 'COS Egress', bounds: COS_PACKAGE_BOUNDS }];
 
   return (
     <div className="space-y-4">
@@ -937,47 +986,49 @@ export default function ThkcosModelTab({ productId, fxRate }: { productId: numbe
                 {g.en === 'COS Traffic' ? (
                   <>
                     <div className="col-span-full space-y-3 rounded-lg border border-slate-800 bg-slate-950/40 p-3">
-                      <div className="grid grid-cols-2 gap-3">
+                      <div
+                        className="grid gap-3 md:[grid-template-columns:var(--top-control-columns)]"
+                        style={{ ['--top-control-columns' as string]: `repeat(${topControlCount}, minmax(0, 1fr))` }}
+                      >
                         <Field label="流量链路" hint="Traffic Path">
                           <Select value={draft.trafficMode} onChange={(e) => set('trafficMode', e.target.value)}>
                             <option value="direct">直连 COS · 外网下行</option>
                             <option value="cdn">经 EO · 边缘下行 + 回源</option>
                           </Select>
                         </Field>
-                        <Field label="EO 缓存命中率 %" hint={isCdn ? '回源 = 全量 ×(1−λ)' : '仅「经 EO」模式生效'}>
-                          <div className="relative">
-                            <Input
-                              type="number"
-                              min="0"
-                              max="100"
-                              step="1"
-                              value={draft.cacheHitRatioPct}
-                              onChange={(e) => set('cacheHitRatioPct', e.target.value)}
-                              placeholder="如 90"
-                              disabled={!isCdn}
-                              className="pr-10"
-                            />
-                            <span className="pointer-events-none absolute inset-y-0 right-2 flex items-center text-[10px] text-slate-500">
-                              %
-                            </span>
-                          </div>
-                        </Field>
+                        {isCdn ? (
+                          <Field label="EO 缓存命中率 %" hint="回源 = 全量 ×(1−λ)">
+                            <div className="relative">
+                              <Input
+                                type="number"
+                                min="0"
+                                max="100"
+                                step="1"
+                                value={draft.cacheHitRatioPct}
+                                onChange={(e) => set('cacheHitRatioPct', e.target.value)}
+                                placeholder="如 90"
+                                className="pr-10"
+                              />
+                              <span className="pointer-events-none absolute inset-y-0 right-2 flex items-center text-[10px] text-slate-500">
+                                %
+                              </span>
+                            </div>
+                          </Field>
+                        ) : null}
                         <Field label="计价模式" hint="Pricing Mode">
                           <Select value={draft.cdnPricingMode} onChange={(e) => set('cdnPricingMode', e.target.value)}>
-                            <option value="tiered">按量 · 阶梯累进</option>
+                            <option value="tiered">{isCdn ? '按量 · 阶梯累进' : '按量 · 官方单价'}</option>
                             <option value="package">预付费 · 流量包</option>
                           </Select>
                         </Field>
-                        <Field label="资源包价格档" hint={isPackage ? 'Package Price' : '仅资源包模式生效'}>
-                          <Select
-                            value={draft.cdnPackagePrice}
-                            onChange={(e) => set('cdnPackagePrice', e.target.value)}
-                            disabled={!isPackage}
-                          >
-                            <option value="renew">连续包月 · 续订价</option>
-                            <option value="list">单次购买 · 刊例价</option>
-                          </Select>
-                        </Field>
+                        {isPackage ? (
+                          <Field label="资源包价格档" hint="Package Price">
+                            <Select value={draft.cdnPackagePrice} onChange={(e) => set('cdnPackagePrice', e.target.value)}>
+                              <option value="renew">连续包月 · 续订价</option>
+                              <option value="list">单次购买 · 刊例价</option>
+                            </Select>
+                          </Field>
+                        ) : null}
                       </div>
 
                       {isCdn ? (
@@ -1034,8 +1085,62 @@ export default function ThkcosModelTab({ productId, fxRate }: { productId: numbe
                             </div>
                           </Field>
                           <div className="col-span-3 text-[10px] leading-relaxed text-slate-500">
-                            EO 套餐内含流量先抵扣；超出部分按所选口径计费。流量包为全球通用，按地区抵扣系数换算（亚太1区 = 2.49，即 1GB 流量包只抵 1/2.49 GB 流量）。回源始终按 COS 回源阶梯累进。
+                            EO 套餐内含流量先抵扣；超出部分按所选口径计费。流量包为全球通用，可在 100GB / 500GB /
+                            1TB / 5TB / 10TB / 50TB / 200TB / 1PB / 5PB / 10PB / 50PB 档位中组合购买，并按地区抵扣系数
+                            换算（亚太1区 = 2.49，即 1GB 流量包只抵 1/2.49 GB 流量）。回源始终按 COS 回源单价计费。
                           </div>
+                        </div>
+                      ) : null}
+
+                      {isCdn ? (
+                        <div className="rounded-lg border border-slate-800 bg-slate-900/40 p-3">
+                          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                            <span className="text-[11px] text-slate-400">
+                              COS 回源单价（官方口径按 GB 单价计费；仅对未命中流量生效）
+                            </span>
+                          </div>
+                          <Field label="COS 回源单价" hint="Origin ¥/GB">
+                            <div className="relative">
+                              <Input
+                                type="number"
+                                min="0"
+                                step="0.0001"
+                                value={draft.cosOriginPerGbCny}
+                                onChange={(e) => set('cosOriginPerGbCny', e.target.value)}
+                                placeholder="如 0.15"
+                                className="pr-12"
+                              />
+                              <span className="pointer-events-none absolute inset-y-0 right-2 flex items-center text-[10px] text-slate-500">
+                                ¥/GB
+                              </span>
+                            </div>
+                          </Field>
+                        </div>
+                      ) : null}
+
+                      {!isCdn && !isPackage ? (
+                        <div className="rounded-lg border border-slate-800 bg-slate-900/40 p-3">
+                          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                            <span className="text-[11px] text-slate-400">
+                              COS 外网下行按量单价（官方口径按 GB 单价计费）
+                            </span>
+                          </div>
+                          <Field label="COS 外网下行单价" hint="COS Egress ¥/GB">
+                            <div className="relative">
+                              <Input
+                                type="number"
+                                min="0"
+                                step="0.0001"
+                                value={draft.cosDownPerGbCny}
+                                onChange={(e) => set('cosDownPerGbCny', e.target.value)}
+                                placeholder="如 0.68"
+                                className="pr-12"
+                              />
+                              <span className="pointer-events-none absolute inset-y-0 right-2 flex items-center text-[10px] text-slate-500">
+                                ¥/GB
+                              </span>
+                            </div>
+                          </Field>
                         </div>
                       ) : null}
 
@@ -1044,8 +1149,8 @@ export default function ThkcosModelTab({ productId, fxRate }: { productId: numbe
                           <div className="flex flex-wrap items-center justify-between gap-2">
                             <span className="text-[11px] text-slate-400">
                               {isCdn
-                                ? 'EO 全球流量包（预付费：按月覆盖超出套餐流量的最省整包组合，上为刊例价 / 下为续订价）；COS 回源仍按量阶梯累进'
-                                : 'COS 外网下行资源包（预付费：按月覆盖流量的最省整包组合，上为刊例价 / 下为续订价）'}
+                                ? 'EO 全球流量包（预付费：在 100GB 到 50PB 档位中按月覆盖超出套餐流量的最省整包组合，上为刊例价 / 下为续订价）；COS 回源仍按单价计费'
+                                : 'COS 外网下行资源包（预付费：在 100GB 到 1PB 档位中按月覆盖流量的最省整包组合，上为刊例价 / 下为续订价）'}
                             </span>
                           </div>
                           {packageRows.map((row) => (
@@ -1055,7 +1160,7 @@ export default function ThkcosModelTab({ productId, fxRate }: { productId: numbe
                                 <span className="text-[10px] text-slate-600">{row.hint}</span>
                               </div>
                               <div className="grid grid-cols-6 gap-2">
-                                {CDN_PACKAGE_BOUNDS.map((b, i) => (
+                                {row.bounds.map((b, i) => (
                                   <div key={i}>
                                     <div className="mb-1 text-center text-[10px] text-slate-500">{b.label}</div>
                                     <div className="space-y-1">
@@ -1084,21 +1189,24 @@ export default function ThkcosModelTab({ productId, fxRate }: { productId: numbe
                         </>
                       ) : (
                         <>
-                          <div className="flex flex-wrap items-center justify-between gap-2">
-                            <span className="text-[11px] text-slate-400">
-                              {isCdn
-                                ? 'EO 超量阶梯 + COS 回源单价（月度阶梯累进：每档仅对落入该档区间的流量计价，再求和）'
-                                : 'COS 外网下行单价（月度阶梯累进：每档仅对落入该档区间的流量计价，再求和）'}
-                            </span>
-                          </div>
+                          {isCdn ? (
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <span className="text-[11px] text-slate-400">
+                                EO 超量阶梯（月度阶梯累进：每档仅对落入该档区间的流量计价，再求和）；COS 回源按单价计费
+                              </span>
+                            </div>
+                          ) : null}
                           {tierRows.map((row) => (
                             <div key={row.key}>
                               <div className="mb-1 flex items-baseline gap-2">
                                 <span className="text-[11px] font-medium text-slate-300">{row.label}</span>
                                 <span className="text-[10px] text-slate-600">{row.hint}</span>
                               </div>
-                              <div className="grid grid-cols-5 gap-2">
-                                {TRAFFIC_TIER_BOUNDS.map((b, i) => (
+                              <div
+                                className="grid gap-2"
+                                style={{ gridTemplateColumns: `repeat(${row.bounds.length}, minmax(0, 1fr))` }}
+                              >
+                                {row.bounds.map((b, i) => (
                                   <div key={i}>
                                     <div className="mb-1 text-center text-[10px] text-slate-500">{b.label}</div>
                                     <div className="relative">

@@ -59,19 +59,19 @@ export type ThkcosVars = {
   premiumPerMinMbHigh: number | null;
   /** λ CDN 缓存命中率 0-1（仅 cdn 模式，回源流量 = 未命中部分） */
   cacheHitRatio: number | null;
-  /** 直连：COS 外网下行阶梯（固定 5 档） */
+  /** 直连：COS 外网下行按量单价（沿用现有阶梯字段存储，取首档折算为 ¥/GB） */
   cosDownTiers: CdnTier[] | null;
-  /** 经 EO：套餐外超量阶梯（固定 5 档，¥/TB） */
+  /** 经 EO：套餐外超量阶梯（固定 7 档，¥/TB） */
   eoOverageTiers: CdnTier[] | null;
-  /** 经 EO：COS 回源阶梯（固定 5 档） */
+  /** 经 EO：COS 回源单价（沿用现有字段存储，取首档折算为 ¥/GB） */
   cosOriginTiers: CdnTier[] | null;
-  /** 计费口径：tiered = 超量阶梯累进，package = 预付费流量包（空 = tiered） */
+  /** 计费口径：tiered = 按量（直连按官方单价 / 经 EO 按超量阶梯），package = 预付费流量包（空 = tiered） */
   cdnPricingMode: CdnPricingMode | null;
   /** 资源包价格档（空 = renew） */
   cdnPackagePrice: CdnPackagePrice | null;
-  /** 直连：COS 外网下行资源包（固定 6 档） */
+  /** 直连：COS 外网下行资源包（预置 8 档，最大放宽至 1PB） */
   cosDownPackages: CdnPackage[] | null;
-  /** 经 EO：全球流量包（固定 6 档，按地区抵扣系数换算） */
+  /** 经 EO：全球流量包（预置 11 档，按地区抵扣系数换算，最大放宽至 50PB） */
   eoPackages: CdnPackage[] | null;
   /** EO 套餐月费 ¥/月（如个人版 29.9） */
   eoPlanMonthlyCny: number | null;
@@ -337,10 +337,10 @@ export type ThkcosMetrics = {
  *   同步 = F·G
  *   基座固定 = A + 域名/12 + SSL/12 + 存储 + 同步 + EO 套餐月费（仅经 EO 模式）
  *   流量TB = H·I·每分钟MB / (1024×1000)
- *   direct：流量费用 = 累进(流量TB, COS 外网下行阶梯) 或 流量包
+ *   direct：流量费用 = 流量GB × COS 外网下行单价（¥/GB） 或 流量包
  *   cdn(EO)：
  *     套餐内含流量先抵扣 → 超出部分走「全球流量包 × 地区抵扣系数」或「超量阶梯累进」
- *     回源量 = 全量 × (1 − 缓存命中率)，始终按 COS 回源阶梯累进
+ *     回源量 = 全量 × (1 − 缓存命中率)，按 COS 回源单价（¥/GB）计费
  *   收入 = 基础/高级 × 月/季/年 六档合计（季卡/年卡按月度确认口径折算）
  */
 export function computeThkcos(vars: ThkcosVars, scenario: ThkcosScenarioKey): ThkcosMetrics {
@@ -374,6 +374,7 @@ export function computeThkcos(vars: ThkcosVars, scenario: ThkcosScenarioKey): Th
   const planIncludedTb = v.eoPlanIncludedGb / GB_PER_TB;
   const trafficAfterPlan = Math.max(0, trafficTb - planIncludedTb);
 
+  const directUnitPerGbCny = firstTierPrice(v.cosDownTiers) / GB_PER_TB;
   const edgeCny =
     v.trafficMode === 'cdn'
       ? isPackage
@@ -381,9 +382,10 @@ export function computeThkcos(vars: ThkcosVars, scenario: ThkcosScenarioKey): Th
         : progressiveCost(trafficAfterPlan, v.eoOverageTiers, 0)
       : isPackage
         ? packageCost(trafficTb, v.cosDownPackages, v.cdnPackagePrice)
-        : progressiveCost(trafficTb, v.cosDownTiers, 0);
-  // 经 EO：回源量 = 全量 × (1 − 缓存命中率)，始终按阶梯累进
-  const originCny = v.trafficMode === 'cdn' ? progressiveCost(trafficTb * (1 - v.cacheHitRatio), v.cosOriginTiers, 0) : 0;
+        : trafficGb * directUnitPerGbCny;
+  // 经 EO：回源量 = 全量 × (1 − 缓存命中率)，按 COS 回源单价（¥/GB）计费
+  const originUnitPerGbCny = firstTierPrice(v.cosOriginTiers) / GB_PER_TB;
+  const originCny = v.trafficMode === 'cdn' ? trafficGb * (1 - v.cacheHitRatio) * originUnitPerGbCny : 0;
   const trafficCny = edgeCny + originCny;
   const blendedPerTbCny =
     trafficTb > 0
@@ -392,10 +394,10 @@ export function computeThkcos(vars: ThkcosVars, scenario: ThkcosScenarioKey): Th
         ? (isPackage
             ? firstPackageUnit(v.eoPackages, v.cdnPackagePrice) / Math.max(1, v.eoDeductionRatio)
             : firstTierPrice(v.eoOverageTiers)) +
-          (1 - v.cacheHitRatio) * firstTierPrice(v.cosOriginTiers)
+          (1 - v.cacheHitRatio) * originUnitPerGbCny * GB_PER_TB
         : isPackage
           ? firstPackageUnit(v.cosDownPackages, v.cdnPackagePrice)
-          : firstTierPrice(v.cosDownTiers);
+          : directUnitPerGbCny * GB_PER_TB;
 
   const totalCostCny = baseFixedCny + trafficCny;
   const revenueCny = subsRevenue(v);
@@ -618,9 +620,9 @@ const PERTURB_TARGETS: PerturbTarget[] = [
   { key: 'premiumMinutes', labelCn: '高级会员人均月观影分钟数', labelEn: 'Premium Min/Viewer', fields: ['premiumMinutesPerViewer'] },
   { key: 'basicViewers', labelCn: '基础会员人数 H1', labelEn: 'Basic Viewers', fields: ['basicViewers'] },
   { key: 'premiumViewers', labelCn: '高级会员人数 H2', labelEn: 'Premium Viewers', fields: ['premiumViewers'] },
-  { key: 'cosDown', labelCn: 'COS 外网下行单价', labelEn: 'COS Egress ¥/TB', fields: ['cosDownTiers'] },
+  { key: 'cosDown', labelCn: 'COS 外网下行单价', labelEn: 'COS Egress ¥/GB', fields: ['cosDownTiers'] },
   { key: 'eoOverage', labelCn: 'EO 超量阶梯单价', labelEn: 'EO Overage ¥/TB', fields: ['eoOverageTiers'] },
-  { key: 'cosOrigin', labelCn: 'COS 回源单价', labelEn: 'COS Origin ¥/TB', fields: ['cosOriginTiers'] },
+  { key: 'cosOrigin', labelCn: 'COS 回源单价', labelEn: 'COS Origin ¥/GB', fields: ['cosOriginTiers'] },
   { key: 'cosDownPkg', labelCn: 'COS 外网下行资源包', labelEn: 'COS Package', fields: ['cosDownPackages'] },
   { key: 'eoPkg', labelCn: 'EO 全球流量包', labelEn: 'EO Package', fields: ['eoPackages'] },
   { key: 'eoPlan', labelCn: 'EO 套餐月费', labelEn: 'EO Plan ¥/mo', fields: ['eoPlanMonthlyCny'] },
@@ -647,13 +649,16 @@ export function thkcosSensitivity(vars: ThkcosVars, scenario: ThkcosScenarioKey,
   if (base == null) return [];
 
   const rows: ThkcosSensitivityRow[] = [];
-  /** 取某字段的「代表值」：阶梯数组取首档单价、资源包取首档折算单价，便于同口径判定与展示。 */
+    /** 取某字段的「代表值」：阶梯数组取首档单价、资源包取首档折算单价，便于同口径判定与展示。 */
   const fieldPrice = (f: keyof ThkcosVars): number => {
     const val = vars[f];
     if (!Array.isArray(val)) return num(val as number | null);
     if (!val.length) return 0;
     const first = val[0] as Record<string, unknown>;
-    if ('pricePerTbCny' in first) return num(first.pricePerTbCny as number);
+    if ('pricePerTbCny' in first) {
+      const price = num(first.pricePerTbCny as number);
+      return f === 'cosOriginTiers' || f === 'cosDownTiers' ? price / GB_PER_TB : price;
+    }
     const sizeGb = num(first.sizeGb as number);
     return sizeGb > 0 ? (num(first.listCny as number) / sizeGb) * GB_PER_TB : 0;
   };
@@ -742,12 +747,12 @@ export function thkcosWarnings(vars: ThkcosVars): string[] {
     out.push(`基础+高级会员人数（${totalViewers}）超过订阅总人数（${subs}），请核对。`);
   }
   const isPackage = v.cdnPricingMode === 'package';
-  const modeCn = isPackage ? '资源包' : '阶梯累进';
+  const modeCn = isPackage ? '资源包' : v.trafficMode === 'cdn' ? '阶梯累进' : '按量单价';
   if (v.trafficMode === 'cdn') {
     out.push(
       isPackage
-        ? '按「经 EO · 全球流量包」口径计费：套餐内含流量先抵扣，超出部分按地区抵扣系数（如亚太1区 2.49）换算后取最省整包覆盖；回源 = 全量 × (1 − 缓存命中率) 仍按 COS 回源阶梯累进。'
-        : '按「经 EO · 超量阶梯」口径计费：套餐内含流量先抵扣，超出部分按月度阶梯累进；回源 = 全量 × (1 − 缓存命中率)。'
+        ? '按「经 EO · 全球流量包」口径计费：套餐内含流量先抵扣，超出部分按地区抵扣系数（如亚太1区 2.49）换算后取最省整包覆盖；回源 = 全量 × (1 − 缓存命中率) 按 COS 回源单价计费。'
+        : '按「经 EO · 超量阶梯」口径计费：套餐内含流量先抵扣，超出部分按月度阶梯累进；回源 = 全量 × (1 − 缓存命中率) 按 COS 回源单价计费。'
     );
     const edgeMissing = isPackage ? !v.eoPackages : !v.eoOverageTiers;
     if (v.eoPlanMonthlyCny === 0 || v.eoPlanIncludedGb === 0) {
@@ -757,12 +762,12 @@ export function thkcosWarnings(vars: ThkcosVars): string[] {
       out.push('未配置 EO 流量包地区抵扣系数，默认按 1（1:1）计算。');
     }
     if (edgeMissing || !v.cosOriginTiers) {
-      out.push('经 EO 口径下超量阶梯/流量包或 COS 回源阶梯未配置，对应流量成本按 0 计。');
+      out.push('经 EO 口径下超量阶梯/流量包或 COS 回源单价未配置，对应流量成本按 0 计。');
     }
   } else {
     const egressMissing = isPackage ? !v.cosDownPackages : !v.cosDownTiers;
     if (egressMissing) {
-      out.push(`按「直连 COS · ${modeCn}」口径计费，但未配置 COS 外网下行${isPackage ? '资源包' : '阶梯'}，流量成本按 0 计。`);
+      out.push(`按「直连 COS · ${modeCn}」口径计费，但未配置 COS 外网下行${isPackage ? '资源包' : '单价'}，流量成本按 0 计。`);
     }
   }
   if (v.domainAnnualCny + v.sslAnnualCny === 0) out.push('域名与 SSL 证书年费为空，未计入基座固定成本。');

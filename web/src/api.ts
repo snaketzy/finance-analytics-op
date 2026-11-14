@@ -925,7 +925,7 @@ export type CdnPricingMode = 'tiered' | 'package';
 export type CdnPackagePrice = 'list' | 'renew';
 
 /**
- * CDN 预付费流量包单档（固定 6 档：100GB / 500GB / 1TB / 5TB / 10TB / 50TB）。
+ * CDN 预付费流量包单档（预置 8 档：100GB / 500GB / 1TB / 5TB / 10TB / 50TB / 200TB / 1PB）。
  * sizeGb 为包容量，listCny / renewCny 为两种价格档下的整包价格 ¥。
  */
 export type CdnPackage = {
@@ -962,9 +962,9 @@ export type EconVars = {
   cdnPricingMode: CdnPricingMode | null;
   /** 资源包价格档（空 = renew） */
   cdnPackagePrice: CdnPackagePrice | null;
-  /** F 亚太一区资源包（固定 6 档） */
+  /** F 亚太一区资源包（预置 8 档，最大放宽至 1PB） */
   cdnTier1Packages: CdnPackage[] | null;
-  /** G 亚太二区资源包（固定 6 档） */
+  /** G 亚太二区资源包（预置 8 档，最大放宽至 1PB） */
   cdnTier2Packages: CdnPackage[] | null;
   /** α 亚太一区流量占比 0-1 */
   tier1Share: number | null;
@@ -1193,19 +1193,19 @@ export type ThkcosVars = {
   premiumPerMinMbHigh: number | null;
   /** λ CDN 缓存命中率 0-1（仅 cdn 模式） */
   cacheHitRatio: number | null;
-  /** 直连：COS 外网下行阶梯（固定 5 档） */
+  /** 直连：COS 外网下行按量单价（沿用现有阶梯字段存储，取首档折算为 ¥/GB） */
   cosDownTiers: CdnTier[] | null;
-  /** 经 EO：套餐外超量阶梯（固定 5 档，¥/TB） */
+  /** 经 EO：套餐外超量阶梯（固定 7 档，¥/TB） */
   eoOverageTiers: CdnTier[] | null;
-  /** 经 EO：COS 回源阶梯（固定 5 档） */
+  /** 经 EO：COS 回源单价（沿用现有字段存储，取首档折算为 ¥/GB） */
   cosOriginTiers: CdnTier[] | null;
-  /** 计费口径：tiered = 超量阶梯累进，package = 预付费流量包（空 = tiered） */
+  /** 计费口径：tiered = 按量（直连按官方单价 / 经 EO 按超量阶梯），package = 预付费流量包（空 = tiered） */
   cdnPricingMode: CdnPricingMode | null;
   /** 资源包价格档（空 = renew） */
   cdnPackagePrice: CdnPackagePrice | null;
-  /** 直连：COS 外网下行资源包（固定 6 档） */
+  /** 直连：COS 外网下行资源包（预置 8 档，最大放宽至 1PB） */
   cosDownPackages: CdnPackage[] | null;
-  /** 经 EO：全球流量包（固定 6 档，按地区抵扣系数换算） */
+  /** 经 EO：全球流量包（预置 11 档，按地区抵扣系数换算，最大放宽至 50PB） */
   eoPackages: CdnPackage[] | null;
   /** EO 套餐月费 ¥/月 */
   eoPlanMonthlyCny: number | null;

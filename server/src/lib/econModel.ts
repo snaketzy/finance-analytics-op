@@ -20,7 +20,7 @@ export type CdnPricingMode = 'tiered' | 'package';
 export type CdnPackagePrice = 'list' | 'renew';
 
 /**
- * CDN 预付费流量包单档（固定 6 档：100GB / 500GB / 1TB / 5TB / 10TB / 50TB）。
+ * CDN 预付费流量包单档（预置 8 档：100GB / 500GB / 1TB / 5TB / 10TB / 50TB / 200TB / 1PB）。
  * sizeGb 为包容量，listCny / renewCny 为两种价格档下的整包价格 ¥。
  */
 export type CdnPackage = {
@@ -57,9 +57,9 @@ export type EconVars = {
   cdnPricingMode: CdnPricingMode | null;
   /** 资源包价格档（空 = renew） */
   cdnPackagePrice: CdnPackagePrice | null;
-  /** F 亚太一区资源包（固定 6 档） */
+  /** F 亚太一区资源包（预置 8 档，最大放宽至 1PB） */
   cdnTier1Packages: CdnPackage[] | null;
-  /** G 亚太二区资源包（固定 6 档） */
+  /** G 亚太二区资源包（预置 8 档，最大放宽至 1PB） */
   cdnTier2Packages: CdnPackage[] | null;
   /** α 亚太一区流量占比 0-1 */
   tier1Share: number | null;
@@ -207,7 +207,7 @@ function gcd(a: number, b: number): number {
 
 /**
  * 资源包（预付费流量包）最优覆盖计价：用最省的一组整包覆盖当月流量（容量可溢出）。
- * 以各档容量的最大公约数为 DP 步长（固定 6 档时步长 = 100GB），
+ * 以各档容量的最大公约数为 DP 步长（当前预置档位步长仍为 100GB），
  * 求「覆盖至少 n·步长」的最小整包总价；允许跨档组合与超量购买。
  * packages 为空视为「未配置资源包」，按 0 计。
  */

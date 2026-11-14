@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   extractErrorMessage,
   useGetUnitEconomicsDetailQuery,
@@ -256,6 +256,7 @@ function formatPct(v: number | null | undefined, digits = 1) {
 
 export default function UnitEconomics() {
   const { data: overview } = useGetUnitEconomicsOverviewQuery();
+  const printRef = useRef<HTMLDivElement | null>(null);
   const [productId, setProductId] = useState<number | null>(null);
 
   useEffect(() => {
@@ -340,10 +341,93 @@ export default function UnitEconomics() {
     }
   }
 
+  function handlePrint() {
+    if (!printRef.current) return;
+    const printFrame = document.createElement('iframe');
+    printFrame.setAttribute('aria-hidden', 'true');
+    printFrame.style.position = 'fixed';
+    printFrame.style.right = '0';
+    printFrame.style.bottom = '0';
+    printFrame.style.width = '0';
+    printFrame.style.height = '0';
+    printFrame.style.border = '0';
+    document.body.appendChild(printFrame);
+
+    const copiedStyles = Array.from(document.querySelectorAll('link[rel="stylesheet"], style'))
+      .map((node) => node.outerHTML)
+      .join('');
+
+    const frameDoc = printFrame.contentDocument;
+    const frameWindow = printFrame.contentWindow;
+    if (!frameDoc || !frameWindow) {
+      document.body.removeChild(printFrame);
+      return;
+    }
+
+    frameDoc.open();
+    frameDoc.write(`
+      <!doctype html>
+      <html lang="zh-CN">
+        <head>
+          <meta charset="utf-8" />
+          <meta name="viewport" content="width=device-width, initial-scale=1" />
+          <title>Unit Economics</title>
+          ${copiedStyles}
+          <style>
+            html, body {
+              background: #fff !important;
+              color: #0f172a !important;
+            }
+            body {
+              margin: 0;
+              padding: 24px;
+            }
+            .print\\:hidden {
+              display: none !important;
+            }
+            .h-full,
+            .overflow-y-auto,
+            .overflow-x-auto {
+              height: auto !important;
+              max-height: none !important;
+              overflow: visible !important;
+            }
+          </style>
+        </head>
+        <body>
+          <div>${printRef.current.innerHTML}</div>
+        </body>
+      </html>
+    `);
+    frameDoc.close();
+
+    const runPrint = () => {
+      if (frameDoc.readyState !== 'complete') {
+        window.setTimeout(runPrint, 50);
+        return;
+      }
+      frameWindow.focus();
+      frameWindow.print();
+      window.setTimeout(() => {
+        document.body.removeChild(printFrame);
+      }, 1000);
+    };
+
+    window.setTimeout(runPrint, 150);
+  }
+
   return (
     <div className="h-full overflow-y-auto">
-      <div className="px-4 py-6 md:px-12">
-        <PageHeader en="Unit Economics" cn="产品盈利模型 · 盈亏平衡 / 盈利周期 / 成本控制">
+      <div ref={printRef} className="px-4 py-6 md:px-12">
+        <PageHeader
+          en="Unit Economics"
+          cn="产品盈利模型 · 盈亏平衡 / 盈利周期 / 成本控制"
+          titleExtra={
+            <Button type="button" variant="primary" size="sm" className="print:hidden" onClick={handlePrint}>
+              打印
+            </Button>
+          }
+        >
           <div className="text-right text-[11px] leading-tight text-slate-500">
             <div>
               在营产品 <span className="text-slate-300">{overview?.summary.count ?? 0}</span> · 高危预警{' '}
