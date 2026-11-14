@@ -190,15 +190,15 @@ function bodyThkcosVars(b: Record<string, unknown>): ThkcosVars {
   return pickThkcosVars(b);
 }
 
-/** 一条 THKCOS 全变量快照：含保存日期（savedAt）与主键，供历史版本回溯。 */
-type ThkcosSnapshotRow = { id: number; savedAt: string; vars: ThkcosVars };
+/** 一条 THKCOS 全变量快照：含名称、保存日期（savedAt）与主键，供历史版本回溯。 */
+type ThkcosSnapshotRow = { id: number; snapshotName: string | null; savedAt: string; vars: ThkcosVars };
 
 /**
  * 读取 THKCOS 全变量快照。默认取「最新一版」（按保存时间倒序）；
  * 传入 snapshotId 时精确取该历史版本。
  */
 async function loadThkcosVars(productId: number, snapshotId?: number): Promise<ThkcosSnapshotRow | null> {
-  const cols = `${THKCOS_KEYS.map((k) => `${toSnake(k)} AS ${k}`).join(', ')}, id, saved_at AS savedAt`;
+  const cols = `${THKCOS_KEYS.map((k) => `${toSnake(k)} AS ${k}`).join(', ')}, id, snapshot_name AS snapshotName, saved_at AS savedAt`;
   const [rows] = snapshotId
     ? await pool.query<Row[]>(
         `SELECT ${cols} FROM product_thkcos_variables WHERE product_id = ? AND id = ? LIMIT 1`,
@@ -210,7 +210,14 @@ async function loadThkcosVars(productId: number, snapshotId?: number): Promise<T
         [productId]
       );
   const r = rows[0];
-  return r ? { id: Number(r.id), savedAt: String(r.savedAt), vars: pickThkcosVars(r) } : null;
+  return r
+    ? {
+        id: Number(r.id),
+        snapshotName: (r.snapshotName as string | null) ?? null,
+        savedAt: String(r.savedAt),
+        vars: pickThkcosVars(r),
+      }
+    : null;
 }
 
 /** 实际经营基线：作为变量输入的参考值（不参与计算）。 */
@@ -298,6 +305,7 @@ async function buildThkcosPayload(productId: number, override?: Partial<ThkcosVa
     productId,
     stored: stored !== null,
     snapshotId: stored?.id ?? null,
+    snapshotName: stored?.snapshotName ?? null,
     savedAt: stored?.savedAt ?? null,
     reference,
     ...buildThkcosModel(vars, currentYm()),
@@ -370,7 +378,7 @@ export default async function (app: FastifyInstance) {
       return fail(404, '产品不存在');
     }
     const [rows] = await pool.query<Row[]>(
-      `SELECT ${THKCOS_KEYS.map((k) => `${toSnake(k)} AS ${k}`).join(', ')}, id, saved_at AS savedAt
+      `SELECT ${THKCOS_KEYS.map((k) => `${toSnake(k)} AS ${k}`).join(', ')}, id, snapshot_name AS snapshotName, saved_at AS savedAt
          FROM product_thkcos_variables
         WHERE product_id = ? ORDER BY saved_at DESC, id DESC LIMIT 100`,
       [productId]
@@ -380,6 +388,7 @@ export default async function (app: FastifyInstance) {
       const neutral = buildThkcosModel(vars, currentYm()).results.neutral;
       return {
         id: Number(r.id),
+        snapshotName: (r.snapshotName as string | null) ?? null,
         savedAt: String(r.savedAt),
         revenueCny: neutral.revenueCny,
         costCny: neutral.totalCostCny,
@@ -431,5 +440,27 @@ export default async function (app: FastifyInstance) {
       return fail(404, '该历史版本不存在');
     }
     return ok({ deleted: res.affectedRows });
+  });
+
+  /** 重命名指定 THKCOS 历史版本快照（留空则恢复默认日期显示）。 */
+  app.patch('/:productId/thkcos-vars/snapshots/:snapshotId', async (req, reply) => {
+    const { productId: pid, snapshotId: sid } = req.params as { productId: string; snapshotId: string };
+    const productId = Number(pid);
+    const snapshotId = Number(sid);
+    const body = (req.body ?? {}) as { snapshotName?: unknown };
+    const snapshotName = typeof body.snapshotName === 'string' ? body.snapshotName.trim() : '';
+    if (snapshotName.length > 80) {
+      reply.code(400);
+      return fail(400, '快照名称不能超过 80 个字符');
+    }
+    const [res] = await pool.query<ResultSetHeader>(
+      'UPDATE product_thkcos_variables SET snapshot_name = ? WHERE product_id = ? AND id = ?',
+      [snapshotName || null, productId, snapshotId]
+    );
+    if (!res.affectedRows) {
+      reply.code(404);
+      return fail(404, '该历史版本不存在');
+    }
+    return ok({ snapshotId, snapshotName: snapshotName || null });
   });
 }

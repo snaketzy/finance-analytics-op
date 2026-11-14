@@ -1124,6 +1124,8 @@ export type EconPayload = EconModel & {
   stored: boolean;
   /** 当前载入的快照主键（未保存时为 null）。 */
   snapshotId: number | null;
+  /** 当前载入快照的自定义名称（未命名时为 null）。 */
+  snapshotName: string | null;
   /** 当前载入的快照保存日期（未保存时为 null）。 */
   savedAt: string | null;
   reference: EconReference;
@@ -1132,6 +1134,7 @@ export type EconPayload = EconModel & {
 /** 全变量历史快照（含保存日期与关键结论，用于速览对比）。 */
 export type EconSnapshot = {
   id: number;
+  snapshotName: string | null;
   savedAt: string;
   revenueCny: number;
   costCny: number;
@@ -1343,6 +1346,7 @@ export type ThkcosPayload = ThkcosModel & {
   productId: number;
   stored: boolean;
   snapshotId: number | null;
+  snapshotName: string | null;
   savedAt: string | null;
   reference: EconReference;
 };
@@ -1350,6 +1354,7 @@ export type ThkcosPayload = ThkcosModel & {
 /** THKCOS 全变量历史快照（含保存日期与关键结论，用于速览对比）。 */
 export type ThkcosSnapshot = {
   id: number;
+  snapshotName: string | null;
   savedAt: string;
   revenueCny: number;
   costCny: number;
@@ -2101,6 +2106,19 @@ export const api = createApi({
       invalidatesTags: ['UnitEconomics'],
     }),
 
+    /** 重命名指定历史版本快照。 */
+    renameUnitEconomicsEconVarsSnapshot: builder.mutation<
+      { snapshotId: number; snapshotName: string | null },
+      { productId: number; snapshotId: number; snapshotName: string | null }
+    >({
+      query: ({ productId, snapshotId, snapshotName }) => ({
+        url: `/unit-economics/${productId}/econ-vars/snapshots/${snapshotId}`,
+        method: 'PATCH',
+        body: { snapshotName },
+      }),
+      invalidatesTags: ['UnitEconomics'],
+    }),
+
     /* ------------------- cf & THKCOS 全变量测算（thkcos-vars） ------------------- */
 
     /** 读取 THKCOS 全变量测算（无记录时按实际流水初始化 Vultr 月租）。 */
@@ -2145,6 +2163,19 @@ export const api = createApi({
       query: ({ productId, snapshotId }) => ({
         url: `/unit-economics/${productId}/thkcos-vars/snapshots/${snapshotId}`,
         method: 'DELETE',
+      }),
+      invalidatesTags: ['UnitEconomics'],
+    }),
+
+    /** 重命名指定 THKCOS 历史版本快照。 */
+    renameUnitEconomicsThkcosVarsSnapshot: builder.mutation<
+      { snapshotId: number; snapshotName: string | null },
+      { productId: number; snapshotId: number; snapshotName: string | null }
+    >({
+      query: ({ productId, snapshotId, snapshotName }) => ({
+        url: `/unit-economics/${productId}/thkcos-vars/snapshots/${snapshotId}`,
+        method: 'PATCH',
+        body: { snapshotName },
       }),
       invalidatesTags: ['UnitEconomics'],
     }),
@@ -2249,12 +2280,14 @@ export const {
   useGetUnitEconomicsEconVarsSnapshotsQuery,
   useLazyGetUnitEconomicsEconVarsSnapshotQuery,
   useDeleteUnitEconomicsEconVarsSnapshotMutation,
+  useRenameUnitEconomicsEconVarsSnapshotMutation,
   useGetUnitEconomicsThkcosVarsQuery,
   useSimulateUnitEconomicsThkcosVarsMutation,
   useSaveUnitEconomicsThkcosVarsMutation,
   useGetUnitEconomicsThkcosVarsSnapshotsQuery,
   useLazyGetUnitEconomicsThkcosVarsSnapshotQuery,
   useDeleteUnitEconomicsThkcosVarsSnapshotMutation,
+  useRenameUnitEconomicsThkcosVarsSnapshotMutation,
   useGetVideoTrafficQuery,
   useSaveVideoTrafficMutation,
 } = api;

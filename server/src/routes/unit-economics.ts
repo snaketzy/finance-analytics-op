@@ -327,15 +327,15 @@ function bodyEconVars(b: Record<string, unknown>): EconVars {
   return pickEconVars(b);
 }
 
-/** 一条全变量快照：含保存日期（savedAt）与主键，供历史版本回溯。 */
-type EconSnapshotRow = { id: number; savedAt: string; vars: EconVars };
+/** 一条全变量快照：含名称、保存日期（savedAt）与主键，供历史版本回溯。 */
+type EconSnapshotRow = { id: number; snapshotName: string | null; savedAt: string; vars: EconVars };
 
 /**
  * 读取全变量快照。默认取「最新一版」（按保存时间倒序）；
  * 传入 snapshotId 时精确取该历史版本。
  */
 async function loadEconVars(productId: number, snapshotId?: number): Promise<EconSnapshotRow | null> {
-  const cols = `${ECON_KEYS.map((k) => `${toSnake(k)} AS ${k}`).join(', ')}, id, saved_at AS savedAt`;
+  const cols = `${ECON_KEYS.map((k) => `${toSnake(k)} AS ${k}`).join(', ')}, id, snapshot_name AS snapshotName, saved_at AS savedAt`;
   const [rows] = snapshotId
     ? await pool.query<Row[]>(
         `SELECT ${cols} FROM product_econ_variables WHERE product_id = ? AND id = ? LIMIT 1`,
@@ -347,7 +347,14 @@ async function loadEconVars(productId: number, snapshotId?: number): Promise<Eco
         [productId]
       );
   const r = rows[0];
-  return r ? { id: Number(r.id), savedAt: String(r.savedAt), vars: pickEconVars(r) } : null;
+  return r
+    ? {
+        id: Number(r.id),
+        snapshotName: (r.snapshotName as string | null) ?? null,
+        savedAt: String(r.savedAt),
+        vars: pickEconVars(r),
+      }
+    : null;
 }
 
 /** 实际经营基线：作为变量输入的参考值（不参与计算）。 */
@@ -430,6 +437,7 @@ async function buildEconPayload(productId: number, override?: Partial<EconVars>,
     productId,
     stored: stored !== null,
     snapshotId: stored?.id ?? null,
+    snapshotName: stored?.snapshotName ?? null,
     savedAt: stored?.savedAt ?? null,
     reference,
     ...buildEconModel(vars, currentYm()),
@@ -619,7 +627,7 @@ export default async function (app: FastifyInstance) {
       return fail(404, '产品不存在');
     }
     const [rows] = await pool.query<Row[]>(
-      `SELECT ${ECON_KEYS.map((k) => `${toSnake(k)} AS ${k}`).join(', ')}, id, saved_at AS savedAt
+      `SELECT ${ECON_KEYS.map((k) => `${toSnake(k)} AS ${k}`).join(', ')}, id, snapshot_name AS snapshotName, saved_at AS savedAt
          FROM product_econ_variables
         WHERE product_id = ? ORDER BY saved_at DESC, id DESC LIMIT 100`,
       [productId]
@@ -629,6 +637,7 @@ export default async function (app: FastifyInstance) {
       const neutral = buildEconModel(vars, currentYm()).results.neutral;
       return {
         id: Number(r.id),
+        snapshotName: (r.snapshotName as string | null) ?? null,
         savedAt: String(r.savedAt),
         revenueCny: neutral.revenueCny,
         costCny: neutral.totalCostCny,
@@ -680,6 +689,28 @@ export default async function (app: FastifyInstance) {
       return fail(404, '该历史版本不存在');
     }
     return ok({ deleted: res.affectedRows });
+  });
+
+  /** 重命名指定历史版本快照（留空则恢复默认日期显示）。 */
+  app.patch('/:productId/econ-vars/snapshots/:snapshotId', async (req, reply) => {
+    const { productId: pid, snapshotId: sid } = req.params as { productId: string; snapshotId: string };
+    const productId = Number(pid);
+    const snapshotId = Number(sid);
+    const body = (req.body ?? {}) as { snapshotName?: unknown };
+    const snapshotName = typeof body.snapshotName === 'string' ? body.snapshotName.trim() : '';
+    if (snapshotName.length > 80) {
+      reply.code(400);
+      return fail(400, '快照名称不能超过 80 个字符');
+    }
+    const [res] = await pool.query<ResultSetHeader>(
+      'UPDATE product_econ_variables SET snapshot_name = ? WHERE product_id = ? AND id = ?',
+      [snapshotName || null, productId, snapshotId]
+    );
+    if (!res.affectedRows) {
+      reply.code(404);
+      return fail(404, '该历史版本不存在');
+    }
+    return ok({ snapshotId, snapshotName: snapshotName || null });
   });
 
   // 预留：外部会员 / 埋点系统推送付费用户结构与行为模式，写入模型假设

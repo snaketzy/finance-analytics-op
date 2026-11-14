@@ -5,6 +5,7 @@ import {
   useGetUnitEconomicsThkcosVarsSnapshotsQuery,
   useLazyGetUnitEconomicsThkcosVarsSnapshotQuery,
   useDeleteUnitEconomicsThkcosVarsSnapshotMutation,
+  useRenameUnitEconomicsThkcosVarsSnapshotMutation,
   useSaveUnitEconomicsThkcosVarsMutation,
   useSimulateUnitEconomicsThkcosVarsMutation,
   type ThkcosMetrics,
@@ -449,6 +450,10 @@ const fmtQty = (v: number) =>
 
 /** 统一展示保存日期（后端返回本地时间字符串 YYYY-MM-DD HH:MM:SS）。 */
 const fmtSavedAt = (v: string | null) => (v ? v.slice(0, 16) : '—');
+const fmtSnapshotName = (name: string | null | undefined, savedAt: string | null) => {
+  const trimmed = name?.trim();
+  return trimmed ? trimmed : fmtSavedAt(savedAt);
+};
 
 /** 每分钟流量区间 MB/min（未填一侧时以另一侧兜底，保证 low ≤ high）。 */
 function mbRange(low: number | null, high: number | null): { low: number; high: number } {
@@ -619,13 +624,17 @@ export default function ThkcosModelTab({ productId, fxRate }: { productId: numbe
   const [save, { isLoading: saving }] = useSaveUnitEconomicsThkcosVarsMutation();
   const [loadSnapshot] = useLazyGetUnitEconomicsThkcosVarsSnapshotQuery();
   const [deleteSnapshot] = useDeleteUnitEconomicsThkcosVarsSnapshotMutation();
+  const [renameSnapshot, { isLoading: renaming }] = useRenameUnitEconomicsThkcosVarsSnapshotMutation();
 
   const [draft, setDraft] = useState<Draft>(() => toDraft(EMPTY_VARS));
   const [sim, setSim] = useState<ThkcosPayload | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [savedAt, setSavedAt] = useState<string | null>(null);
+  const [snapshotName, setSnapshotName] = useState<string | null>(null);
   const [loadedId, setLoadedId] = useState<number | null>(null);
   const [pendingDelete, setPendingDelete] = useState<{ id: number; when: string } | null>(null);
+  const [pendingRename, setPendingRename] = useState<{ id: number; when: string } | null>(null);
+  const [renameValue, setRenameValue] = useState('');
 
   const initedRef = useRef<number | null>(null);
   useEffect(() => {
@@ -635,6 +644,7 @@ export default function ThkcosModelTab({ productId, fxRate }: { productId: numbe
     setSim(null);
     setError(null);
     setSavedAt(data.savedAt);
+    setSnapshotName(data.snapshotName);
     setLoadedId(data.snapshotId);
   }, [data, productId]);
 
@@ -676,6 +686,7 @@ export default function ThkcosModelTab({ productId, fxRate }: { productId: numbe
       const res = await save({ productId, vars }).unwrap();
       setSim(res);
       setSavedAt(res.savedAt);
+      setSnapshotName(res.snapshotName);
       setLoadedId(res.snapshotId);
     } catch (e) {
       setError(extractErrorMessage(e));
@@ -690,6 +701,7 @@ export default function ThkcosModelTab({ productId, fxRate }: { productId: numbe
       setDraft(toDraft(res.vars));
       setSim(res);
       setSavedAt(res.savedAt);
+      setSnapshotName(res.snapshotName);
       setLoadedId(res.snapshotId);
     } catch (e) {
       setError(extractErrorMessage(e));
@@ -700,6 +712,12 @@ export default function ThkcosModelTab({ productId, fxRate }: { productId: numbe
   function handleDeleteSnapshot(snapshotId: number) {
     const when = fmtSavedAt(history?.snapshots.find((s) => s.id === snapshotId)?.savedAt ?? null);
     setPendingDelete({ id: snapshotId, when });
+  }
+
+  function handleRenameSnapshot(snapshotId: number) {
+    const target = history?.snapshots.find((s) => s.id === snapshotId);
+    setPendingRename({ id: snapshotId, when: fmtSavedAt(target?.savedAt ?? null) });
+    setRenameValue(target?.snapshotName ?? '');
   }
 
   /** 确认删除某一历史版本快照。 */
@@ -713,7 +731,23 @@ export default function ThkcosModelTab({ productId, fxRate }: { productId: numbe
       if (loadedId === snapshotId) {
         setLoadedId(null);
         setSavedAt(null);
+        setSnapshotName(null);
       }
+    } catch (e) {
+      setError(extractErrorMessage(e));
+    }
+  }
+
+  /** 确认重命名某一历史版本快照。 */
+  async function confirmRename() {
+    if (!pendingRename) return;
+    const snapshotId = pendingRename.id;
+    const nextName = renameValue.trim() || null;
+    setError(null);
+    try {
+      await renameSnapshot({ productId, snapshotId, snapshotName: nextName }).unwrap();
+      if (loadedId === snapshotId) setSnapshotName(nextName);
+      setPendingRename(null);
     } catch (e) {
       setError(extractErrorMessage(e));
     }
@@ -805,7 +839,7 @@ export default function ThkcosModelTab({ productId, fxRate }: { productId: numbe
         <div className="flex items-center gap-2">
           {savedAt ? (
             <span className={`text-[11px] tabular-nums ${isHistorical ? 'text-amber-400' : 'text-emerald-400'}`}>
-              {isHistorical ? '历史版本' : '保存日期'} {fmtSavedAt(savedAt)}
+              {isHistorical ? '历史版本' : '保存日期'} {fmtSnapshotName(snapshotName, savedAt)}
             </span>
           ) : (
             <span className="text-[11px] text-slate-500">尚未保存</span>
@@ -834,22 +868,38 @@ export default function ThkcosModelTab({ productId, fxRate }: { productId: numbe
                     active ? 'border-sky-500/70 bg-sky-500/10' : 'border-slate-800 bg-slate-900/60 hover:border-slate-600'
                   }`}
                 >
-                  <div className="flex items-center justify-between gap-3 text-[11px] font-medium tabular-nums text-slate-200">
-                    <span>{fmtSavedAt(s.savedAt)}</span>
-                    {active ? (
-                      <span className="text-sky-400">· 当前</span>
-                    ) : (
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="truncate text-[11px] font-medium text-slate-200">
+                        {fmtSnapshotName(s.snapshotName, s.savedAt)}
+                      </div>
+                      <div className="mt-0.5 text-[10px] tabular-nums text-slate-500">{fmtSavedAt(s.savedAt)}</div>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-2 text-[11px]">
+                      {active ? <span className="text-sky-400">当前</span> : null}
                       <button
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
-                          handleDeleteSnapshot(s.id);
+                          handleRenameSnapshot(s.id);
                         }}
-                        className="rounded px-1 text-rose-400 transition hover:bg-rose-500/10 hover:text-rose-300"
+                        className="rounded px-1 text-slate-400 transition hover:bg-slate-800 hover:text-slate-200"
                       >
-                        删除
+                        重命名
                       </button>
-                    )}
+                      {!active ? (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteSnapshot(s.id);
+                          }}
+                          className="rounded px-1 text-rose-400 transition hover:bg-rose-500/10 hover:text-rose-300"
+                        >
+                          删除
+                        </button>
+                      ) : null}
+                    </div>
                   </div>
                   <div className="mt-0.5 text-[10px] text-slate-500">
                     月净利{' '}
@@ -939,7 +989,7 @@ export default function ThkcosModelTab({ productId, fxRate }: { productId: numbe
                 <span className="text-rose-400">{error}</span>
               ) : savedAt ? (
                 <span className={isHistorical ? 'text-amber-400' : 'text-emerald-400'}>
-                  {isHistorical ? '历史版本' : '已保存'} {fmtSavedAt(savedAt)}
+                  {isHistorical ? '历史版本' : '已保存'} {fmtSnapshotName(snapshotName, savedAt)}
                 </span>
               ) : (
                 'A~G 成本维度 · L/M 收入维度'
@@ -1448,6 +1498,32 @@ export default function ThkcosModelTab({ productId, fxRate }: { productId: numbe
           </ul>
         </Card>
       ) : null}
+
+      {/* 重命名历史版本弹窗 */}
+      <Modal
+        open={pendingRename != null}
+        title="重命名历史版本"
+        onClose={() => setPendingRename(null)}
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setPendingRename(null)}>
+              取消
+            </Button>
+            <Button onClick={confirmRename} disabled={renaming}>
+              {renaming ? '保存中…' : '保存名称'}
+            </Button>
+          </>
+        }
+      >
+        <Field label="版本名称" hint="留空则恢复默认日期名">
+          <Input
+            value={renameValue}
+            onChange={(e) => setRenameValue(e.target.value)}
+            maxLength={80}
+            placeholder={pendingRename ? `例如：${pendingRename.when} · 调价前版本` : '输入版本名称'}
+          />
+        </Field>
+      </Modal>
 
       {/* 删除历史版本确认弹窗 */}
       <Modal
