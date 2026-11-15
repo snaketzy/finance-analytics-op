@@ -3,6 +3,8 @@ import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useGetFxLatestQuery } from '../api';
 import { formatDate, formatRate } from '../lib/format';
 
+const SIDEBAR_COLLAPSED_STORAGE_KEY = 'fbap.sidebar.collapsed';
+
 type NavLeaf = { to: string; en: string; cn: string; end?: boolean };
 type NavGroup = { key: string; en: string; cn: string; children: NavLeaf[] };
 
@@ -119,57 +121,90 @@ function FxBadge() {
 }
 
 export function AppLayout() {
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return window.localStorage.getItem(SIDEBAR_COLLAPSED_STORAGE_KEY) === '1';
+  });
+
+  useEffect(() => {
+    window.localStorage.setItem(SIDEBAR_COLLAPSED_STORAGE_KEY, sidebarCollapsed ? '1' : '0');
+  }, [sidebarCollapsed]);
+
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-slate-950 text-slate-100">
       {/* 侧边栏 */}
-      <aside className="flex w-60 shrink-0 flex-col border-r border-slate-800 bg-slate-900">
-        <div className="flex h-16 shrink-0 items-center gap-2.5 border-b border-slate-800 px-5">
-          <div className="grid h-8 w-8 place-items-center rounded-md bg-emerald-500/15 text-sm font-bold text-emerald-400">
-            F
+      <aside
+        className={`flex shrink-0 overflow-hidden bg-slate-900 transition-[width,border-color] duration-200 ${
+          sidebarCollapsed ? 'w-0 border-r border-transparent' : 'w-60 border-r border-slate-800'
+        }`}
+      >
+        <div
+          className={`flex h-full w-60 min-w-60 flex-col transition-opacity duration-150 ${
+            sidebarCollapsed ? 'pointer-events-none opacity-0' : 'opacity-100'
+          }`}
+          aria-hidden={sidebarCollapsed}
+        >
+          <div className="flex h-16 shrink-0 items-center gap-2.5 border-b border-slate-800 px-5">
+            <div className="grid h-8 w-8 place-items-center rounded-md bg-emerald-500/15 text-sm font-bold text-emerald-400">
+              F
+            </div>
+            <div className="leading-tight">
+              <div className="text-sm font-semibold">FBAP</div>
+              <div className="text-[11px] text-slate-500">财务与经营分析</div>
+            </div>
           </div>
-          <div className="leading-tight">
-            <div className="text-sm font-semibold">FBAP</div>
-            <div className="text-[11px] text-slate-500">财务与经营分析</div>
-          </div>
-        </div>
-        <nav className="flex-1 space-y-1 overflow-y-auto p-3">
-          {NAV.map((item) =>
-            'children' in item ? (
-              <NavGroupItem key={item.key} group={item} />
-            ) : (
-              <NavLink
-                key={item.to}
-                to={item.to}
-                end={item.end}
-                className={({ isActive }) =>
-                  `block rounded-md px-3 py-2 transition ${
-                    isActive
-                      ? 'bg-emerald-500/10 text-emerald-300'
-                      : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
-                  }`
-                }
-              >
-                {({ isActive }) => (
-                  <div className="leading-tight">
-                    <div className="text-sm font-medium">{item.en}</div>
-                    <div className={`text-[11px] ${isActive ? 'text-emerald-400/70' : 'text-slate-500'}`}>
-                      {item.cn}
+          <nav className="flex-1 space-y-1 overflow-y-auto p-3">
+            {NAV.map((item) =>
+              'children' in item ? (
+                <NavGroupItem key={item.key} group={item} />
+              ) : (
+                <NavLink
+                  key={item.to}
+                  to={item.to}
+                  end={item.end}
+                  className={({ isActive }) =>
+                    `block rounded-md px-3 py-2 transition ${
+                      isActive
+                        ? 'bg-emerald-500/10 text-emerald-300'
+                        : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
+                    }`
+                  }
+                >
+                  {({ isActive }) => (
+                    <div className="leading-tight">
+                      <div className="text-sm font-medium">{item.en}</div>
+                      <div className={`text-[11px] ${isActive ? 'text-emerald-400/70' : 'text-slate-500'}`}>
+                        {item.cn}
+                      </div>
                     </div>
-                  </div>
-                )}
-              </NavLink>
-            )
-          )}
-        </nav>
-        <div className="border-t border-slate-800 px-5 py-3 text-[11px] text-slate-600">v1.0</div>
+                  )}
+                </NavLink>
+              )
+            )}
+          </nav>
+          <div className="border-t border-slate-800 px-5 py-3 text-[11px] text-slate-600">v1.0</div>
+        </div>
       </aside>
 
       {/* 右侧主区 */}
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="flex h-16 shrink-0 items-center justify-between border-b border-slate-800 bg-slate-900 px-4 md:px-12">
-          <div className="leading-tight">
-            <div className="text-base font-semibold">Finance &amp; Business Analytics</div>
-            <div className="text-[11px] text-slate-500">项目财务与经营分析平台</div>
+          <div className="flex min-w-0 items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setSidebarCollapsed((value) => !value)}
+              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-slate-800 bg-slate-950/60 text-slate-300 transition hover:border-slate-700 hover:bg-slate-800 hover:text-slate-100"
+              aria-label={sidebarCollapsed ? '展开左侧菜单栏' : '隐藏左侧菜单栏'}
+              title={sidebarCollapsed ? '展开左侧菜单栏' : '隐藏左侧菜单栏'}
+            >
+              <svg viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4">
+                {sidebarCollapsed ? <path d="M6 4l8 6-8 6V4z" /> : <path d="M14 4l-8 6 8 6V4z" />}
+              </svg>
+            </button>
+            <div className="min-w-0 leading-tight">
+              <div className="text-base font-semibold">Finance &amp; Business Analytics</div>
+              <div className="truncate text-[11px] text-slate-500">项目财务与经营分析平台</div>
+            </div>
           </div>
           <FxBadge />
         </header>
