@@ -1486,9 +1486,14 @@ export type CloudflareBillLine = {
 
 /* ------------------------- 支付渠道收入同步 ------------------------- */
 
-export type PaymentSource = 'stripe' | 'paypal';
+export type PaymentSource = 'stripe' | 'paypal' | 'waffo_pancake' | 'paddle' | 'creem';
 
-export type PaymentSourceStatus = { source: PaymentSource; enabled: boolean };
+export type PaymentSourceStatus = {
+  source: PaymentSource;
+  enabled: boolean;
+  status: 'ready' | 'needs_config' | 'coming_soon';
+  message: string | null;
+};
 
 export type PaymentPreviewItem = {
   sourceKey: string;

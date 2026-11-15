@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { pool } from '../db';
 import { fail, ok } from '../http';
-import { PAYMENT_SOURCES, type PaymentSource } from '../lib/channel';
+import { PAYMENT_SOURCES, sourceMeta, type PaymentSource } from '../lib/channel';
 import { fetchStripeMonth, stripeEnabled } from '../lib/stripe';
 import { fetchPaypalMonth, paypalEnabled } from '../lib/paypal';
 import { insertPaymentImport, markImported } from '../lib/paymentImport';
@@ -20,19 +20,44 @@ function isSource(value: string): value is PaymentSource {
 
 /** 读取某渠道某月的归一化收入交易（不落库）。 */
 async function readMonth(source: PaymentSource, period: string, types: string[]) {
-  return source === 'stripe' ? fetchStripeMonth(period, types) : fetchPaypalMonth(period);
+  switch (source) {
+    case 'stripe':
+      return fetchStripeMonth(period, types);
+    case 'paypal':
+      return fetchPaypalMonth(period);
+    default:
+      throw apiError(`${sourceMeta(source).cn} API 同步尚未接入`, 501);
+  }
+}
+
+function getSourceStatus(source: PaymentSource): {
+  source: PaymentSource;
+  enabled: boolean;
+  status: 'ready' | 'needs_config' | 'coming_soon';
+  message: string | null;
+} {
+  const meta = sourceMeta(source);
+  if (!meta.implemented) {
+    return {
+      source,
+      enabled: false,
+      status: 'coming_soon',
+      message: `${meta.cn} 已加入支付渠道列表，API 同步待接入。`,
+    };
+  }
+
+  const enabled = source === 'stripe' ? stripeEnabled() : paypalEnabled();
+  return {
+    source,
+    enabled,
+    status: enabled ? 'ready' : 'needs_config',
+    message: enabled ? null : `请先在后端 .env 配置 ${meta.credentialHint} 并重启服务。`,
+  };
 }
 
 export default async function paymentsRoutes(app: FastifyInstance) {
   // 渠道配置状态：未配置密钥时前端给出提示。
-  app.get('/sources', async () =>
-    ok(
-      PAYMENT_SOURCES.map((source) => ({
-        source,
-        enabled: source === 'stripe' ? stripeEnabled() : paypalEnabled(),
-      }))
-    )
-  );
+  app.get('/sources', async () => ok(PAYMENT_SOURCES.map((source) => getSourceStatus(source))));
 
   // 预览：读取渠道账单周期内收入交易 + 是否已导入。
   app.get('/:source/preview', async (req, reply) => {

@@ -25,7 +25,18 @@ type RowState = {
 const SOURCES: { source: PaymentSource; label: string }[] = [
   { source: 'stripe', label: 'Stripe' },
   { source: 'paypal', label: 'PayPal' },
+  { source: 'waffo_pancake', label: 'Waffo Pancake' },
+  { source: 'paddle', label: 'Paddle' },
+  { source: 'creem', label: 'Creem' },
 ];
+
+const SOURCE_COPY: Record<PaymentSource, string> = {
+  stripe: '读取 Stripe balance_transactions：毛额入收入、平台手续费单独记入「支付手续费」科目；退款等非正金额交易自动排除。',
+  paypal: '读取 PayPal reporting/transactions：毛额入收入、PayPal 手续费单独记入「支付手续费」科目；退款等非正金额交易自动排除。',
+  waffo_pancake: 'Waffo Pancake 已作为支付渠道预留入口，后续可接入对账单、结算单与收款同步。',
+  paddle: 'Paddle 已作为支付渠道预留入口，后续可接入订阅结算与收款同步。',
+  creem: 'Creem 已作为支付渠道预留入口，后续可接入账单与收款同步。',
+};
 
 function previousMonth(): string {
   const date = new Date();
@@ -84,7 +95,8 @@ export default function Payments() {
   const [runPreview, { isFetching: loading }] = useLazyPreviewPaymentsQuery();
   const [importPayments, { isLoading: importing }] = useImportPaymentsMutation();
 
-  const enabled = sourceStatus.find((item) => item.source === source)?.enabled ?? true;
+  const currentStatus = sourceStatus.find((item) => item.source === source);
+  const enabled = currentStatus?.enabled ?? false;
 
   const switchSource = (next: PaymentSource) => {
     setSource(next);
@@ -172,15 +184,15 @@ export default function Payments() {
 
   return (
     <div className="flex h-full flex-col overflow-hidden px-4 py-5 md:px-12 md:py-6">
-      <PageHeader en="Payment Channels" cn="支付渠道 · Stripe / PayPal 收入自动同步" />
+      <PageHeader en="Payment Channels" cn="支付渠道 · 多渠道收入自动同步" />
       <div className="min-h-0 flex-1 space-y-5 overflow-y-auto pb-6">
         <Card>
           <CardHeader
             en="Revenue Sync"
             cn="拉取渠道账单 → 毛额记收入、手续费记支出（拆两行）"
             right={
-              <div className="flex items-end gap-2">
-                <div className="flex overflow-hidden rounded-md border border-slate-700">
+              <div className="flex flex-wrap items-end gap-2">
+                <div className="flex flex-wrap overflow-hidden rounded-md border border-slate-700">
                   {SOURCES.map((item) => (
                     <button
                       key={item.source}
@@ -198,7 +210,7 @@ export default function Payments() {
                 <Field label="计费月份">
                   <MonthInput value={period} onChange={setPeriod} />
                 </Field>
-                <Button onClick={handlePreview} disabled={loading || !period}>
+                <Button onClick={handlePreview} disabled={loading || !period || !enabled}>
                   {loading ? '读取中…' : '预览账单'}
                 </Button>
               </div>
@@ -206,15 +218,11 @@ export default function Payments() {
           />
           <div className="space-y-3 p-5">
             <p className="text-xs leading-5 text-slate-500">
-              {source === 'stripe'
-                ? '读取 Stripe balance_transactions（默认 charge 类型）：毛额入收入、平台手续费单独记入「支付手续费」科目；退款等非正金额交易自动排除。'
-                : '读取 PayPal reporting/transactions：毛额入收入、PayPal 手续费单独记入「支付手续费」科目；退款等非正金额交易自动排除。'}
-              {' '}导入后自动关联到对应渠道的资金账户（Stripe 余额 / PayPal 余额），便于对账。
+              {SOURCE_COPY[source]} 导入后会自动关联到对应渠道的资金账户，便于对账。
             </p>
-            {!enabled && (
+            {currentStatus?.message && (
               <div className="rounded-md bg-amber-500/10 px-3 py-2 text-xs text-amber-300">
-                当前渠道未配置 API 凭据，请在后端 .env 设置
-                {source === 'stripe' ? ' STRIPE_SECRET_KEY' : ' PAYPAL_CLIENT_ID / PAYPAL_CLIENT_SECRET'} 后重启服务。
+                {currentStatus.message}
               </div>
             )}
             {error && <div className="rounded-md bg-rose-500/10 px-3 py-2 text-xs text-rose-300">{error}</div>}
