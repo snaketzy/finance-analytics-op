@@ -21,8 +21,6 @@ const NAV: (NavLeaf | NavGroup)[] = [
     ],
   },
   { to: '/budgets', en: 'Budgets', cn: '预算' },
-  { to: '/projects', en: 'Projects', cn: '项目维护' },
-  { to: '/products', en: 'Products', cn: '产品维护' },
   { to: '/unit-economics', en: 'Unit Economics', cn: '盈利模型' },
   {
     key: 'analytics',
@@ -38,6 +36,8 @@ const NAV: (NavLeaf | NavGroup)[] = [
     en: 'Settings',
     cn: '设置',
     children: [
+      { to: '/projects', en: 'Projects', cn: '项目维护' },
+      { to: '/products', en: 'Products', cn: '产品维护' },
       { to: '/categories', en: 'Categories', cn: '科目' },
       { to: '/suppliers', en: 'Suppliers', cn: '供应商' },
       { to: '/accounts', en: 'Accounts', cn: '账户' },
