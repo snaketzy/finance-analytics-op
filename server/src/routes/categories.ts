@@ -9,7 +9,7 @@ const INCOME_DOMAINS = [
   'sponsorship', 'incentive', 'financial', 'other',
 ];
 const EXPENSE_DOMAINS = [
-  'infra', 'compute', 'content', 'people', 'marketing', 'channel', 'ops', 'other',
+  'infra', 'sunk', 'compute', 'content', 'people', 'marketing', 'channel', 'ops', 'other',
 ];
 
 function domainsFor(type: string): string[] {

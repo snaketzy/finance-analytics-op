@@ -22,6 +22,7 @@ function domainOptions(type: CategoryType) {
 
 type FormState = {
   editing: Category | null;
+  copyingFrom: Category | null;
   type: CategoryType;
   parentId: string;
   domain: string;
@@ -36,6 +37,7 @@ type FormState = {
 function emptyForm(type: CategoryType = 'expense'): FormState {
   return {
     editing: null,
+    copyingFrom: null,
     type,
     parentId: '',
     domain: domainOptions(type)[0]?.key ?? '',
@@ -55,6 +57,7 @@ function DomainSection({
   onEdit,
   onDelete,
   onAddChild,
+  onCopy,
 }: {
   type: CategoryType;
   list: Category[];
@@ -62,6 +65,7 @@ function DomainSection({
   onEdit: (c: Category) => void;
   onDelete: (c: Category) => void;
   onAddChild: (parent: Category) => void;
+  onCopy: (c: Category) => void;
 }) {
   const groups = useMemo(() => buildCategoryGroups(list), [list]);
   if (groups.length === 0) return <Empty text="暂无科目" />;
@@ -118,6 +122,14 @@ function DomainSection({
                     ) : null}
                     <span className="hidden truncate text-[11px] text-slate-500 sm:inline">{c.nameEn}</span>
                     <span className="hidden gap-1 group-hover:flex">
+                      {c.parentId !== null ? (
+                        <button
+                          onClick={() => onCopy(c)}
+                          className="rounded px-1 text-[11px] text-sky-400 transition hover:bg-sky-500/10"
+                        >
+                          复制
+                        </button>
+                      ) : null}
                       <button
                         onClick={() => onEdit(c)}
                         className="rounded px-1 text-[11px] text-slate-400 transition hover:bg-slate-700 hover:text-slate-200"
@@ -183,6 +195,7 @@ export default function Categories() {
   function openEdit(c: Category) {
     setForm({
       editing: c,
+      copyingFrom: null,
       type: c.type,
       parentId: c.parentId === null ? '' : String(c.parentId),
       domain: c.domain,
@@ -192,6 +205,23 @@ export default function Categories() {
       isRecurring: Boolean(c.isRecurring),
       isCogs: Boolean(c.isCogs),
       sortOrder: String(c.sortOrder ?? ''),
+    });
+    setOpen(true);
+  }
+
+  function openCopy(c: Category) {
+    setForm({
+      editing: null,
+      copyingFrom: c,
+      type: c.type,
+      parentId: c.parentId === null ? '' : String(c.parentId),
+      domain: c.domain,
+      nameCn: c.nameCn,
+      nameEn: c.nameEn,
+      note: c.note ?? '',
+      isRecurring: Boolean(c.isRecurring),
+      isCogs: Boolean(c.isCogs),
+      sortOrder: '',
     });
     setOpen(true);
   }
@@ -216,6 +246,10 @@ export default function Categories() {
     const nameEn = form.nameEn.trim();
     if (!nameCn || !nameEn) {
       setError('请填写中英文科目名');
+      return;
+    }
+    if (form.copyingFrom && !form.parentId) {
+      setError('复制子科目时请选择目标上级科目');
       return;
     }
     const sortOrder = form.sortOrder === '' ? undefined : Number(form.sortOrder);
@@ -291,6 +325,7 @@ export default function Categories() {
                 onEdit={openEdit}
                 onDelete={remove}
                 onAddChild={openCreateChild}
+                onCopy={openCopy}
               />
             </section>
 
@@ -309,6 +344,7 @@ export default function Categories() {
                 onEdit={openEdit}
                 onDelete={remove}
                 onAddChild={openCreateChild}
+                onCopy={openCopy}
               />
             </section>
           </div>
@@ -317,7 +353,13 @@ export default function Categories() {
 
       <Modal
         open={open}
-        title={form.editing ? '编辑科目 / Edit Category' : '新增科目 / New Category'}
+        title={
+          form.editing
+            ? '编辑科目 / Edit Category'
+            : form.copyingFrom
+              ? '复制子科目 / Copy Category'
+              : '新增科目 / New Category'
+        }
         onClose={() => setOpen(false)}
         footer={
           <>
@@ -334,20 +376,23 @@ export default function Categories() {
           <Field label="收支类型 Type">
             <Select
               value={form.type}
-              disabled={!!form.editing}
+              disabled={!!form.editing || !!form.copyingFrom}
               onChange={(e) => changeType(e.target.value as CategoryType)}
             >
               <option value="income">收入 Income</option>
               <option value="expense">支出 Expense</option>
             </Select>
           </Field>
-          <Field label="上级科目 Parent" hint="留空=顶层领域">
+          <Field
+            label="上级科目 Parent"
+            hint={form.copyingFrom ? '复制子科目时必须选择目标上级科目' : '留空=顶层领域'}
+          >
             <Select
               value={form.parentId}
               disabled={!!form.editing}
               onChange={(e) => changeParent(e.target.value)}
             >
-              <option value="">（无 · 领域父节点）</option>
+              {!form.copyingFrom ? <option value="">（无 · 领域父节点）</option> : null}
               {parents.map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.nameCn} {p.nameEn}

@@ -5,8 +5,11 @@ import {
   useDeleteBudgetMutation,
   useGetBudgetsQuery,
   useGetCategoriesQuery,
+  useGetProjectDetailQuery,
   useGetProjectsQuery,
+  useUpdateBudgetMutation,
   type Budget,
+  type Category,
   type BudgetPeriodType,
 } from '../api';
 import { Card, CardHeader, Empty, PageHeader } from '../components/Card';
@@ -14,11 +17,9 @@ import { Button, Field, Input, MonthInput, Select } from '../components/Field';
 import { Modal } from '../components/Modal';
 import { Money } from '../components/Money';
 import { buildCategoryGroups } from '../lib/categories';
-import { domainLabel } from '../lib/domains';
 import { formatInt, formatRate } from '../lib/format';
 
-function CategoryOptions() {
-  const { data: categories = [] } = useGetCategoriesQuery({ type: 'expense' });
+function CategoryOptions({ categories }: { categories: Category[] }) {
   const groups = useMemo(() => buildCategoryGroups(categories), [categories]);
   return (
     <>
@@ -57,7 +58,18 @@ function UsageBar({ rate, over }: { rate: number | null; over: boolean }) {
   );
 }
 
+function formatRatio(ratio: number) {
+  return `${(ratio * 100).toFixed(ratio * 100 % 1 === 0 ? 0 : 1)}%`;
+}
+
+function formatSupplierSummary(suppliers: string[]) {
+  if (suppliers.length === 0) return '—';
+  if (suppliers.length <= 2) return suppliers.join(' / ');
+  return `${suppliers[0]} / ${suppliers[1]} +${suppliers.length - 2}`;
+}
+
 type FormState = {
+  editing: Budget | null;
   projectId: string;
   categoryId: string;
   periodType: BudgetPeriodType;
@@ -66,6 +78,7 @@ type FormState = {
 };
 
 const emptyForm = (): FormState => ({
+  editing: null,
   projectId: '',
   categoryId: '',
   periodType: 'monthly',
@@ -79,6 +92,7 @@ export default function Budgets() {
   const [overOnly, setOverOnly] = useState(false);
 
   const { data: projects = [] } = useGetProjectsQuery();
+  const { data: categories = [] } = useGetCategoriesQuery({ type: 'expense' });
   const { data, isLoading } = useGetBudgetsQuery({
     ...(projectId ? { projectId: Number(projectId) } : {}),
     ...(period ? { period } : {}),
@@ -86,21 +100,61 @@ export default function Budgets() {
   });
 
   const [createOne, { isLoading: creating }] = useCreateBudgetMutation();
+  const [updateOne, { isLoading: updating }] = useUpdateBudgetMutation();
   const [deleteOne] = useDeleteBudgetMutation();
 
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState<FormState>(emptyForm);
   const [error, setError] = useState<string | null>(null);
+  const selectedProjectId = form.projectId ? Number(form.projectId) : null;
+  const { data: selectedProjectDetail } = useGetProjectDetailQuery(selectedProjectId ?? 0, {
+    skip: selectedProjectId === null,
+  });
 
   useEffect(() => {
-    if (open) {
-      setForm(emptyForm());
-      setError(null);
-    }
+    if (open) setError(null);
   }, [open]);
+
+  const categoryById = useMemo(() => {
+    const map = new Map<number, (typeof categories)[number]>();
+    categories.forEach((category) => map.set(category.id, category));
+    return map;
+  }, [categories]);
 
   const summary = data?.summary;
   const items = data?.items ?? [];
+
+  function resolveScopeLines(b: Budget) {
+    if (b.categoryId === null) {
+      return {
+        level1Cn: '项目总预算',
+        level2Cn: 'Total',
+      };
+    }
+    const current = categoryById.get(b.categoryId);
+    const parent = current?.parentId ? categoryById.get(current.parentId) : null;
+    return {
+      level1Cn: parent?.nameCn ?? current?.nameCn ?? b.categoryNameCn,
+      level2Cn: parent ? (current?.nameCn ?? b.categoryNameCn) : '—',
+    };
+  }
+
+  function openCreate() {
+    setForm(emptyForm());
+    setOpen(true);
+  }
+
+  function openEdit(b: Budget) {
+    setForm({
+      editing: b,
+      projectId: String(b.projectId),
+      categoryId: b.categoryId === null ? '' : String(b.categoryId),
+      periodType: b.periodType,
+      period: b.period,
+      amountCny: String(b.amountCny),
+    });
+    setOpen(true);
+  }
 
   async function submit(e: FormEvent) {
     e.preventDefault();
@@ -115,13 +169,18 @@ export default function Budgets() {
       return;
     }
     try {
-      await createOne({
+      const body = {
         projectId: Number(form.projectId),
         categoryId: form.categoryId ? Number(form.categoryId) : null,
         period: form.period,
         periodType: form.periodType,
         amountCny: amount,
-      }).unwrap();
+      };
+      if (form.editing) {
+        await updateOne({ id: form.editing.id, body }).unwrap();
+      } else {
+        await createOne(body).unwrap();
+      }
       setOpen(false);
     } catch (err) {
       setError(extractErrorMessage(err));
@@ -129,8 +188,14 @@ export default function Budgets() {
   }
 
   async function remove(b: Budget) {
-    await deleteOne(b.id).unwrap().catch(() => undefined);
+    try {
+      await deleteOne(b.id).unwrap();
+    } catch (err) {
+      window.alert(extractErrorMessage(err));
+    }
   }
+
+  const saving = creating || updating;
 
   return (
     <div className="h-full overflow-y-auto">
@@ -163,7 +228,7 @@ export default function Budgets() {
               />
               仅看超预算
             </label>
-            <Button onClick={() => setOpen(true)}>+ 新增预算</Button>
+            <Button onClick={openCreate}>+ 新增预算</Button>
           </div>
         </PageHeader>
 
@@ -203,11 +268,14 @@ export default function Budgets() {
             <Empty />
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[1000px] text-sm">
+              <table className="w-full min-w-[1120px] text-sm">
                 <thead>
                   <tr className="text-left text-[11px] uppercase tracking-wide text-slate-500">
                     <th className="px-4 py-2.5 font-medium">周期 Period</th>
+                    <th className="px-4 py-2.5 font-medium">产品 Product</th>
+                    <th className="px-4 py-2.5 font-medium">项目 Project</th>
                     <th className="px-4 py-2.5 font-medium">预算对象 Scope</th>
+                    <th className="px-4 py-2.5 font-medium">供应商 Supplier</th>
                     <th className="px-4 py-2.5 text-right font-medium">预算 Budget</th>
                     <th className="px-4 py-2.5 text-right font-medium">实际 Actual</th>
                     <th className="px-4 py-2.5 text-right font-medium">差异 Variance</th>
@@ -217,58 +285,95 @@ export default function Budgets() {
                 </thead>
                 <tbody>
                   {items.map((b) => (
-                    <tr
-                      key={b.id}
-                      className={`border-t border-slate-800/70 hover:bg-slate-800/30 ${
-                        b.overBudget ? 'bg-rose-500/[0.04]' : ''
-                      }`}
-                    >
-                      <td className="px-4 py-3">
-                        <div className="leading-tight">
-                          <div className="text-xs tabular-nums text-slate-200">{b.period}</div>
-                          <div className="text-[11px] text-slate-500">
-                            {b.periodType === 'yearly' ? '年度 Yearly' : b.periodType === 'once' ? '一次性 One-time' : '月度 Monthly'}
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="leading-tight">
-                          <div className="text-xs text-slate-300">{b.projectNameCn}</div>
-                          <div className="text-[11px] text-slate-500">
-                            {b.categoryId === null ? (
-                              <span className="text-indigo-300">项目总预算 / Total</span>
+                    (() => {
+                      const scope = resolveScopeLines(b);
+                      return (
+                        <tr
+                          key={b.id}
+                          className={`border-t border-slate-800/70 hover:bg-slate-800/30 ${
+                            b.overBudget ? 'bg-rose-500/[0.04]' : ''
+                          }`}
+                        >
+                          <td className="px-4 py-3">
+                            <div className="leading-tight">
+                              <div className="text-xs tabular-nums text-slate-200">{b.period}</div>
+                              <div className="text-[11px] text-slate-500">
+                                {b.periodType === 'yearly' ? '年度 Yearly' : b.periodType === 'once' ? '一次性 One-time' : '月度 Monthly'}
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3">
+                            {b.products.length === 0 ? (
+                              <div className="text-[11px] text-slate-600">—</div>
                             ) : (
-                              <>
-                                {b.categoryNameCn} · {domainLabel(b.domain ?? '', 'expense').cn}
-                              </>
+                              <div className="space-y-1 leading-tight">
+                                {b.products.map((product) => (
+                                  <div key={product.productId}>
+                                    <div className="text-xs text-slate-300">{product.nameCn}</div>
+                                    <div className="text-[11px] text-slate-500">
+                                      {product.nameEn} · {formatRatio(product.ratio)}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
                             )}
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <Money cny={b.amountCny} usd={b.budgetUsd} size="sm" align="right" mainClass="text-indigo-300" />
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <Money cny={b.actualCny} usd={b.actualUsd} size="sm" align="right" mainClass="text-rose-300" />
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <Money
-                          cny={b.varianceCny}
-                          usd={b.varianceUsd}
-                          size="sm"
-                          align="right"
-                          mainClass={b.varianceCny >= 0 ? 'text-emerald-400' : 'text-rose-400'}
-                        />
-                      </td>
-                      <td className="px-4 py-3">
-                        <UsageBar rate={b.usageRate} over={b.overBudget} />
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <Button variant="danger" size="sm" onClick={() => remove(b)}>
-                          删除
-                        </Button>
-                      </td>
-                    </tr>
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="leading-tight">
+                              <div className="text-xs text-slate-300">{b.projectNameCn}</div>
+                              <div className="text-[11px] text-slate-500">{b.projectNameEn}</div>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="leading-tight">
+                              <div className="text-xs text-slate-300">{scope.level1Cn}</div>
+                              <div className="text-[11px] text-slate-500">{scope.level2Cn}</div>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="leading-tight">
+                              <div className="text-xs text-slate-300">
+                                {formatSupplierSummary(b.suppliers)}
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 text-right">
+                            <Money cny={b.amountCny} usd={b.budgetUsd} size="sm" align="right" mainClass="text-indigo-300" />
+                          </td>
+                          <td className="px-4 py-3 text-right">
+                            <Money cny={b.actualCny} usd={b.actualUsd} size="sm" align="right" mainClass="text-rose-300" />
+                          </td>
+                          <td className="px-4 py-3 text-right">
+                            <Money
+                              cny={b.varianceCny}
+                              usd={b.varianceUsd}
+                              size="sm"
+                              align="right"
+                              mainClass={b.varianceCny >= 0 ? 'text-emerald-400' : 'text-rose-400'}
+                            />
+                          </td>
+                          <td className="px-4 py-3">
+                            <UsageBar rate={b.usageRate} over={b.overBudget} />
+                          </td>
+                          <td className="px-4 py-3 text-right">
+                            <div className="flex justify-end gap-2">
+                              <Button variant="ghost" size="sm" onClick={() => openEdit(b)}>
+                                编辑
+                              </Button>
+                              <Button
+                                variant="danger"
+                                size="sm"
+                                onClick={() => remove(b)}
+                                disabled={b.actualCny > 0}
+                                title={b.actualCny > 0 ? '已有实际支出，不能删除' : undefined}
+                              >
+                                删除
+                              </Button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })()
                   ))}
                 </tbody>
               </table>
@@ -279,15 +384,15 @@ export default function Budgets() {
 
       <Modal
         open={open}
-        title="新增预算 / New Budget"
+        title={form.editing ? '编辑预算 / Edit Budget' : '新增预算 / New Budget'}
         onClose={() => setOpen(false)}
         footer={
           <>
             <Button variant="ghost" onClick={() => setOpen(false)}>
               取消
             </Button>
-            <Button type="submit" form="budget-form" disabled={creating}>
-              {creating ? '保存中…' : '保存'}
+            <Button type="submit" form="budget-form" disabled={saving}>
+              {saving ? '保存中…' : '保存'}
             </Button>
           </>
         }
@@ -303,13 +408,32 @@ export default function Budgets() {
               ))}
             </Select>
           </Field>
+          <div className="rounded-2xl border border-slate-800 bg-slate-950/40 px-4 py-3 sm:col-span-2">
+            <div className="mb-1 text-[11px] uppercase tracking-wide text-slate-500">产品 Product</div>
+            {!form.projectId ? (
+              <div className="text-xs text-slate-500">先选择项目后显示当前产品分摊</div>
+            ) : (selectedProjectDetail?.productShares.length ?? 0) === 0 ? (
+              <div className="text-xs text-slate-500">该项目当前未分摊到任何产品</div>
+            ) : (
+              <div className="space-y-2">
+                {selectedProjectDetail?.productShares.map((share) => (
+                  <div key={share.productId} className="leading-tight">
+                    <div className="text-sm text-slate-200">{share.nameCn}</div>
+                    <div className="text-[11px] text-slate-500">
+                      {share.nameEn} · {formatRatio(share.ratio)}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
           <Field label="预算对象 Scope" hint="可留空=项目总预算">
             <Select
               value={form.categoryId}
               onChange={(e) => setForm({ ...form, categoryId: e.target.value })}
             >
               <option value="">（项目总预算 / Total）</option>
-              <CategoryOptions />
+              <CategoryOptions categories={categories} />
             </Select>
           </Field>
           <Field label="周期类型 Period Type">

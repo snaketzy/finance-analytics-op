@@ -101,13 +101,16 @@ CREATE TABLE IF NOT EXISTS recurring_costs (
 
 -- ---------- 预算 ----------
 CREATE TABLE IF NOT EXISTS budgets (
-  id          BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-  project_id  BIGINT UNSIGNED NOT NULL,
-  category_id BIGINT UNSIGNED NULL,
-  period      CHAR(7) NOT NULL,
-  period_type ENUM('monthly','yearly') NOT NULL DEFAULT 'monthly',
-  amount_cny  DECIMAL(18,2) NOT NULL,
-  UNIQUE KEY uk_budget (project_id, category_id, period)
+  id                  BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  project_id          BIGINT UNSIGNED NOT NULL,
+  category_id         BIGINT UNSIGNED NULL,
+  supplier_id         BIGINT UNSIGNED NULL,
+  budget_category_key BIGINT UNSIGNED AS (COALESCE(category_id, 0)) STORED,
+  budget_supplier_key BIGINT UNSIGNED AS (COALESCE(supplier_id, 0)) STORED,
+  period              CHAR(7) NOT NULL,
+  period_type         ENUM('monthly','yearly') NOT NULL DEFAULT 'monthly',
+  amount_cny          DECIMAL(18,2) NOT NULL,
+  UNIQUE KEY uk_budget_scope (project_id, budget_category_key, budget_supplier_key, period)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ---------- 产品用户（被分析对象） ----------

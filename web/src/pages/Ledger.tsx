@@ -99,6 +99,12 @@ export default function Ledger() {
   const { data: projects = [] } = useGetProjectsQuery();
   const { data: categories = [] } = useGetCategoriesQuery({});
 
+  const categoryById = useMemo(() => {
+    const map = new Map<number, Category>();
+    categories.forEach((category) => map.set(category.id, category));
+    return map;
+  }, [categories]);
+
   const queryArgs: TransactionQuery = useMemo(
     () => ({
       ...(filters.projectId ? { projectId: Number(filters.projectId) } : {}),
@@ -128,6 +134,15 @@ export default function Ledger() {
   const [voucherUploading, setVoucherUploading] = useState(false);
 
   const items = data?.items ?? [];
+
+  function resolveCategoryLines(t: Transaction) {
+    const current = categoryById.get(t.categoryId);
+    const parent = current?.parentId ? categoryById.get(current.parentId) : null;
+    return {
+      level1Cn: parent?.nameCn ?? current?.nameCn ?? t.categoryNameCn,
+      level2Cn: parent ? (current?.nameCn ?? t.categoryNameCn) : null,
+    };
+  }
 
   // 关键词防抖
   useEffect(() => {
@@ -370,56 +385,61 @@ export default function Ledger() {
               </tr>
             ) : (
               items.map((t) => (
-                <tr key={t.id} className="border-b border-slate-800/60 hover:bg-slate-800/30">
-                  <td className="whitespace-nowrap px-3 py-2.5 tabular-nums text-slate-300">
-                    {formatDate(t.txnDate)}
-                  </td>
-                  <td className="px-3 py-2.5">
-                    <div className="leading-tight">
-                      <div className="text-slate-200">{t.projectNameCn}</div>
-                      <div className="text-[11px] text-slate-500">{t.projectNameEn}</div>
-                    </div>
-                  </td>
-                  <td className="px-3 py-2.5">
-                    <div className="leading-tight">
-                      <div className="text-slate-200">{t.categoryNameCn}</div>
-                      <div className="text-[11px] text-slate-500">{t.categoryNameEn}</div>
-                    </div>
-                  </td>
-                  <td className="px-3 py-2.5">
-                    <span
-                      className={`rounded px-2 py-0.5 text-[11px] ${
-                        t.direction === 'income'
-                          ? 'bg-emerald-500/10 text-emerald-400'
-                          : 'bg-rose-500/10 text-rose-400'
-                      }`}
-                    >
-                      {DIRECTION_LABEL[t.direction].cn} {DIRECTION_LABEL[t.direction].en}
-                    </span>
-                  </td>
-                  <td className="whitespace-nowrap px-3 py-2.5 text-right">
-                    <Money cny={t.amountCny} usd={t.amountUsd} size="sm" align="right" />
-                  </td>
-                  <td className="max-w-[160px] truncate px-3 py-2.5 text-slate-400">
-                    {t.counterparty || '—'}
-                  </td>
-                  <td className="max-w-[200px] truncate px-3 py-2.5 text-slate-500" title={t.note ?? ''}>
-                    {t.note || '—'}
-                  </td>
-                  <td className="whitespace-nowrap px-3 py-2.5 text-right">
-                    <div className="inline-flex gap-1.5">
-                      <Button variant="ghost" size="sm" onClick={() => openVoucher(t)}>
-                        {t.attachmentCount > 0 ? `凭证 ${t.attachmentCount}` : '凭证'}
-                      </Button>
-                      <Button variant="ghost" size="sm" onClick={() => openEdit(t)}>
-                        编辑
-                      </Button>
-                      <Button variant="danger" size="sm" onClick={() => removeTransaction(t)}>
-                        删除
-                      </Button>
-                    </div>
-                  </td>
-                </tr>
+                (() => {
+                  const categoryLines = resolveCategoryLines(t);
+                  return (
+                    <tr key={t.id} className="border-b border-slate-800/60 hover:bg-slate-800/30">
+                      <td className="whitespace-nowrap px-3 py-2.5 tabular-nums text-slate-300">
+                        {formatDate(t.txnDate)}
+                      </td>
+                      <td className="px-3 py-2.5">
+                        <div className="leading-tight">
+                          <div className="text-slate-200">{t.projectNameCn}</div>
+                          <div className="text-[11px] text-slate-500">{t.projectNameEn}</div>
+                        </div>
+                      </td>
+                      <td className="px-3 py-2.5">
+                        <div className="leading-tight">
+                          <div className="text-slate-200">{categoryLines.level1Cn}</div>
+                          <div className="text-[11px] text-slate-500">{categoryLines.level2Cn ?? '—'}</div>
+                        </div>
+                      </td>
+                      <td className="px-3 py-2.5">
+                        <span
+                          className={`rounded px-2 py-0.5 text-[11px] ${
+                            t.direction === 'income'
+                              ? 'bg-emerald-500/10 text-emerald-400'
+                              : 'bg-rose-500/10 text-rose-400'
+                          }`}
+                        >
+                          {DIRECTION_LABEL[t.direction].cn} {DIRECTION_LABEL[t.direction].en}
+                        </span>
+                      </td>
+                      <td className="whitespace-nowrap px-3 py-2.5 text-right">
+                        <Money cny={t.amountCny} usd={t.amountUsd} size="sm" align="right" />
+                      </td>
+                      <td className="max-w-[160px] truncate px-3 py-2.5 text-slate-400">
+                        {t.counterparty || '—'}
+                      </td>
+                      <td className="max-w-[200px] truncate px-3 py-2.5 text-slate-500" title={t.note ?? ''}>
+                        {t.note || '—'}
+                      </td>
+                      <td className="whitespace-nowrap px-3 py-2.5 text-right">
+                        <div className="inline-flex gap-1.5">
+                          <Button variant="ghost" size="sm" onClick={() => openVoucher(t)}>
+                            {t.attachmentCount > 0 ? `凭证 ${t.attachmentCount}` : '凭证'}
+                          </Button>
+                          <Button variant="ghost" size="sm" onClick={() => openEdit(t)}>
+                            编辑
+                          </Button>
+                          <Button variant="danger" size="sm" onClick={() => removeTransaction(t)}>
+                            删除
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })()
               ))
             )}
           </tbody>

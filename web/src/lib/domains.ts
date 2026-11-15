@@ -16,6 +16,7 @@ export const INCOME_DOMAINS: Record<string, DomainLabel> = {
 
 export const EXPENSE_DOMAINS: Record<string, DomainLabel> = {
   infra: { cn: '基础设施', en: 'Infrastructure' },
+  sunk: { cn: '沉没成本', en: 'Sunk Cost' },
   compute: { cn: '算力', en: 'Compute' },
   content: { cn: '内容', en: 'Content' },
   people: { cn: '人力', en: 'People' },
@@ -54,4 +55,3 @@ export const SUPPLIER_REGION_LABEL: Record<string, DomainLabel> = {
   cn: { cn: '国内', en: 'Domestic' },
   global: { cn: '海外', en: 'Overseas' },
 };
-

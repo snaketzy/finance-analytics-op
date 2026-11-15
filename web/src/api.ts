@@ -502,11 +502,20 @@ export type GenerateResult = { id: number; until: string; generated: number; las
 
 export type BudgetPeriodType = 'monthly' | 'yearly' | 'once';
 
+export type BudgetProductShare = {
+  productId: number;
+  nameCn: string;
+  nameEn: string;
+  ratio: number;
+};
+
 export type Budget = {
   id: number;
   projectId: number;
   projectNameCn: string;
   projectNameEn: string;
+  products: BudgetProductShare[];
+  suppliers: string[];
   categoryId: number | null;
   categoryNameCn: string | null;
   categoryNameEn: string | null;
@@ -542,6 +551,8 @@ export type BudgetInput = {
   periodType?: BudgetPeriodType;
   amountCny: number;
 };
+
+export type BudgetUpdateInput = BudgetInput;
 
 /* --------------------------- P2 · 成本收入分析 --------------------------- */
 
@@ -1873,6 +1884,14 @@ export const api = createApi({
       invalidatesTags: ['Budget'],
     }),
 
+    updateBudget: builder.mutation<
+      { id: number; projectId: number; categoryId: number | null; period: string; amountCny: number },
+      { id: number; body: BudgetUpdateInput }
+    >({
+      query: ({ id, body }) => ({ url: `/budgets/${id}`, method: 'PATCH', body }),
+      invalidatesTags: ['Budget'],
+    }),
+
     deleteBudget: builder.mutation<{ id: number }, number>({
       query: (id) => ({ url: `/budgets/${id}`, method: 'DELETE' }),
       invalidatesTags: ['Budget'],
@@ -2247,6 +2266,7 @@ export const {
   useUpdateUsageRecordMutation,
   useGetBudgetsQuery,
   useCreateBudgetMutation,
+  useUpdateBudgetMutation,
   useDeleteBudgetMutation,
   useGetCostAnalyticsQuery,
   useGetRevenueAnalyticsQuery,
