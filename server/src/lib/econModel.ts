@@ -79,10 +79,20 @@ export type EconVars = {
   basicPerMinMbHigh: number | null;
   /** K2 高级会员每分钟流量上限 MB */
   premiumPerMinMbHigh: number | null;
+  /** X1 体验卡人数 */
+  experienceCardSubs: number | null;
+  /** Y1 体验卡固定单价 ¥ */
+  experienceCardPriceCny: number | null;
+  /** Z1 VIP 卡人数（价格固定 0） */
+  vipCardSubs: number | null;
   /** L1 基础会员 · 月卡订阅人数 */
   basicMonthlySubs: number | null;
   /** M1 基础会员 · 月卡 ¥/月 */
   basicMonthlyPriceCny: number | null;
+  /** L11 基础会员 · 连续包月订阅人数 */
+  basicContinuousMonthlySubs: number | null;
+  /** M11 基础会员 · 连续包月 ¥/月 */
+  basicContinuousMonthlyPriceCny: number | null;
   /** L2 基础会员 · 季卡订阅人数（实收 ×3） */
   basicQuarterlySubs: number | null;
   /** M2 基础会员 · 季卡 ¥/月（实收 = ×3） */
@@ -95,6 +105,10 @@ export type EconVars = {
   premiumMonthlySubs: number | null;
   /** M4 高级会员 · 月卡 ¥/月 */
   premiumMonthlyPriceCny: number | null;
+  /** L41 高级会员 · 连续包月订阅人数 */
+  premiumContinuousMonthlySubs: number | null;
+  /** M41 高级会员 · 连续包月 ¥/月 */
+  premiumContinuousMonthlyPriceCny: number | null;
   /** L5 高级会员 · 季卡订阅人数（实收 ×3） */
   premiumQuarterlySubs: number | null;
   /** M5 高级会员 · 季卡 ¥/月（实收 = ×3） */
@@ -265,14 +279,21 @@ function resolve(vars: EconVars): Numeric {
     premiumPerMinMbLow: num(vars.premiumPerMinMbLow),
     basicPerMinMbHigh: num(vars.basicPerMinMbHigh),
     premiumPerMinMbHigh: num(vars.premiumPerMinMbHigh),
+    experienceCardSubs: num(vars.experienceCardSubs),
+    experienceCardPriceCny: vars.experienceCardPriceCny == null ? 9.9 : num(vars.experienceCardPriceCny),
+    vipCardSubs: num(vars.vipCardSubs),
     basicMonthlySubs: num(vars.basicMonthlySubs),
     basicMonthlyPriceCny: num(vars.basicMonthlyPriceCny),
+    basicContinuousMonthlySubs: num(vars.basicContinuousMonthlySubs),
+    basicContinuousMonthlyPriceCny: num(vars.basicContinuousMonthlyPriceCny),
     basicQuarterlySubs: num(vars.basicQuarterlySubs),
     basicQuarterlyPriceCny: num(vars.basicQuarterlyPriceCny),
     basicYearlySubs: num(vars.basicYearlySubs),
     basicYearlyPriceCny: num(vars.basicYearlyPriceCny),
     premiumMonthlySubs: num(vars.premiumMonthlySubs),
     premiumMonthlyPriceCny: num(vars.premiumMonthlyPriceCny),
+    premiumContinuousMonthlySubs: num(vars.premiumContinuousMonthlySubs),
+    premiumContinuousMonthlyPriceCny: num(vars.premiumContinuousMonthlyPriceCny),
     premiumQuarterlySubs: num(vars.premiumQuarterlySubs),
     premiumQuarterlyPriceCny: num(vars.premiumQuarterlyPriceCny),
     premiumYearlySubs: num(vars.premiumYearlySubs),
@@ -298,25 +319,32 @@ function mbForGroup(low: number, high: number, scenario: EconScenarioKey): numbe
   return (lo + hi) / 2;
 }
 
-/** 订阅收入（月度确认口径）：基础/高级 × 月/季/年 六档合计。 */
+/** 订阅收入（月度确认口径）：体验卡 + 基础/高级 × 月/季/年。VIP 卡价格固定 0。 */
 function subsRevenue(v: Numeric): number {
   return (
+    v.experienceCardSubs * v.experienceCardPriceCny +
     v.basicMonthlySubs * v.basicMonthlyPriceCny +
+    v.basicContinuousMonthlySubs * v.basicContinuousMonthlyPriceCny +
     v.basicQuarterlySubs * v.basicQuarterlyPriceCny +
     v.basicYearlySubs * v.basicYearlyPriceCny +
     v.premiumMonthlySubs * v.premiumMonthlyPriceCny +
+    v.premiumContinuousMonthlySubs * v.premiumContinuousMonthlyPriceCny +
     v.premiumQuarterlySubs * v.premiumQuarterlyPriceCny +
     v.premiumYearlySubs * v.premiumYearlyPriceCny
   );
 }
 
-/** 订阅人数合计（基础 + 高级 × 月/季/年）。 */
+/** 订阅人数合计（体验卡 + 基础 + VIP + 高级 × 月/季/年）。 */
 function subsCount(v: Numeric): number {
   return (
+    v.experienceCardSubs +
     v.basicMonthlySubs +
+    v.basicContinuousMonthlySubs +
     v.basicQuarterlySubs +
     v.basicYearlySubs +
+    v.vipCardSubs +
     v.premiumMonthlySubs +
+    v.premiumContinuousMonthlySubs +
     v.premiumQuarterlySubs +
     v.premiumYearlySubs
   );
@@ -623,10 +651,11 @@ const PERTURB_TARGETS: PerturbTarget[] = [
   { key: 'cdnTier1', labelCn: '亚太一区单价 F', labelEn: 'APAC-1 ¥/TB', fields: ['cdnTier1PerTbCny', 'cdnTier1Tiers', 'cdnTier1Packages'] },
   { key: 'cdnTier2', labelCn: '亚太二区单价 G', labelEn: 'APAC-2 ¥/TB', fields: ['cdnTier2PerTbCny', 'cdnTier2Tiers', 'cdnTier2Packages'] },
   { key: 'tier1Share', labelCn: '亚太一区占比 α', labelEn: 'APAC-1 Share', fields: ['tier1Share'] },
-  { key: 'basicSubs', labelCn: '基础会员人数 L1/L2/L3', labelEn: 'Basic Subs', fields: ['basicMonthlySubs', 'basicQuarterlySubs', 'basicYearlySubs'] },
-  { key: 'premiumSubs', labelCn: '高级会员人数 L4/L5/L6', labelEn: 'Premium Subs', fields: ['premiumMonthlySubs', 'premiumQuarterlySubs', 'premiumYearlySubs'] },
-  { key: 'basicPrice', labelCn: '基础会员单价 M1/M2/M3', labelEn: 'Basic Price', fields: ['basicMonthlyPriceCny', 'basicQuarterlyPriceCny', 'basicYearlyPriceCny'] },
-  { key: 'premiumPrice', labelCn: '高级会员单价 M4/M5/M6', labelEn: 'Premium Price', fields: ['premiumMonthlyPriceCny', 'premiumQuarterlyPriceCny', 'premiumYearlyPriceCny'] },
+  { key: 'basicSubs', labelCn: '基础会员人数 X1/L1/L11/L2/L3', labelEn: 'Basic Subs', fields: ['experienceCardSubs', 'basicMonthlySubs', 'basicContinuousMonthlySubs', 'basicQuarterlySubs', 'basicYearlySubs'] },
+  { key: 'premiumSubs', labelCn: '高级会员人数 Z1/L4/L41/L5/L6', labelEn: 'Premium Subs', fields: ['vipCardSubs', 'premiumMonthlySubs', 'premiumContinuousMonthlySubs', 'premiumQuarterlySubs', 'premiumYearlySubs'] },
+  { key: 'experiencePrice', labelCn: '体验卡单价 Y1', labelEn: 'Trial Price', fields: ['experienceCardPriceCny'] },
+  { key: 'basicPrice', labelCn: '基础会员单价 M1/M11/M2/M3', labelEn: 'Basic Price', fields: ['basicMonthlyPriceCny', 'basicContinuousMonthlyPriceCny', 'basicQuarterlyPriceCny', 'basicYearlyPriceCny'] },
+  { key: 'premiumPrice', labelCn: '高级会员单价 M4/M41/M5/M6', labelEn: 'Premium Price', fields: ['premiumMonthlyPriceCny', 'premiumContinuousMonthlyPriceCny', 'premiumQuarterlyPriceCny', 'premiumYearlyPriceCny'] },
   { key: 'vultr', labelCn: 'Vultr 月租 A', labelEn: 'Vultr Host', fields: ['vultrMonthlyCny'] },
   { key: 'domain', labelCn: '域名年费', labelEn: 'Domain', fields: ['domainAnnualCny'] },
   { key: 'ssl', labelCn: 'SSL 证书年费', labelEn: 'SSL Cert', fields: ['sslAnnualCny'] },
@@ -714,8 +743,9 @@ export function econWarnings(vars: EconVars): string[] {
   const totalViewers = v.basicViewers + v.premiumViewers;
   if (subs === 0) out.push('未填订阅人数，月收入为 0。');
   if (
-    v.basicMonthlyPriceCny + v.basicQuarterlyPriceCny + v.basicYearlyPriceCny +
-    v.premiumMonthlyPriceCny + v.premiumQuarterlyPriceCny + v.premiumYearlyPriceCny === 0
+    v.experienceCardPriceCny +
+    v.basicMonthlyPriceCny + v.basicContinuousMonthlyPriceCny + v.basicQuarterlyPriceCny + v.basicYearlyPriceCny +
+    v.premiumMonthlyPriceCny + v.premiumContinuousMonthlyPriceCny + v.premiumQuarterlyPriceCny + v.premiumYearlyPriceCny === 0
   ) out.push('未填订阅单价，月收入为 0。');
   if (v.libraryTitles === 0 || v.avgTitleGb === 0 || v.r2StoragePerGbCny === 0) {
     out.push('片库数量、单片体积或存储单价为空，R2 存储成本按 0 计。');
@@ -729,6 +759,14 @@ export function econWarnings(vars: EconVars): string[] {
   }
   if (v.premiumPerMinMbLow > 0 && v.premiumPerMinMbHigh > 0 && v.premiumPerMinMbLow > v.premiumPerMinMbHigh) {
     out.push('高级会员每分钟流量下限 J2 大于上限 K2，已自动交换后计算。');
+  }
+  const basicCap = v.experienceCardSubs + v.basicMonthlySubs + v.basicContinuousMonthlySubs + v.basicQuarterlySubs + v.basicYearlySubs;
+  const premiumCap = v.vipCardSubs + v.premiumMonthlySubs + v.premiumContinuousMonthlySubs + v.premiumQuarterlySubs + v.premiumYearlySubs;
+  if (v.basicViewers > basicCap && basicCap > 0) {
+    out.push(`基础会员人数（${v.basicViewers}）超过可承载人数（X1+L1+L11+L2+L3 = ${basicCap}），请核对。`);
+  }
+  if (v.premiumViewers > premiumCap && premiumCap > 0) {
+    out.push(`高级会员人数（${v.premiumViewers}）超过可承载人数（Z1+L4+L41+L5+L6 = ${premiumCap}），请核对。`);
   }
   if (totalViewers > subs && subs > 0) {
     out.push(`基础+高级会员人数（${totalViewers}）超过订阅总人数（${subs}），请核对。`);

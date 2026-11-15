@@ -75,19 +75,8 @@ const SAMPLE_COUNT = 16;
 
 const num = (v: number | null | undefined) => (v == null || !Number.isFinite(Number(v)) ? 0 : Number(v));
 
-function sumBasicSubs(vars: ThkcosVars) {
-  return num(vars.basicMonthlySubs) + num(vars.basicQuarterlySubs) + num(vars.basicYearlySubs);
-}
-
-function sumAllSubs(vars: ThkcosVars) {
-  return (
-    num(vars.basicMonthlySubs) +
-    num(vars.basicQuarterlySubs) +
-    num(vars.basicYearlySubs) +
-    num(vars.premiumMonthlySubs) +
-    num(vars.premiumQuarterlySubs) +
-    num(vars.premiumYearlySubs)
-  );
+function basicContinuousMonthlySubsOf(vars: ThkcosVars) {
+  return num(vars.basicContinuousMonthlySubs);
 }
 
 function niceMax(value: number) {
@@ -105,45 +94,30 @@ function buildSamples(max: number, current: number) {
   return Array.from(points).sort((a, b) => a - b);
 }
 
-function scaleBasicMix(targetSubscribers: number, vars: ThkcosVars): [number, number, number] {
-  const target = Math.max(0, Math.round(targetSubscribers));
-  const base = [num(vars.basicMonthlySubs), num(vars.basicQuarterlySubs), num(vars.basicYearlySubs)];
-  const total = base[0] + base[1] + base[2];
-  const weights = total > 0 ? base.map((item) => item / total) : [1, 0, 0];
-  const raw = weights.map((w) => w * target);
-  const floor = raw.map((item) => Math.floor(item));
-  let rest = target - floor.reduce((sum, item) => sum + item, 0);
-  const rank = raw
-    .map((item, index) => ({ index, frac: item - floor[index] }))
-    .sort((a, b) => b.frac - a.frac);
-  for (let i = 0; i < rank.length && rest > 0; i += 1) {
-    floor[rank[i].index] += 1;
-    rest -= 1;
-  }
-  return [floor[0] ?? 0, floor[1] ?? 0, floor[2] ?? 0];
-}
-
 function buildScenarioVars(
   base: ThkcosVars,
-  basicSubscribers: number,
+  continuousMonthlyUsers: number,
   libraryTitles: number,
   subtab: FitSubtabKey
 ): ThkcosVars {
   const config = FIT_SUBTABS.find((item) => item.key === subtab) ?? FIT_SUBTABS[0];
-  const [basicMonthlySubs, basicQuarterlySubs, basicYearlySubs] = scaleBasicMix(basicSubscribers, base);
-  const viewers = Math.max(0, Math.round(basicSubscribers));
+  const viewers = Math.max(0, Math.round(continuousMonthlyUsers));
   return {
     ...base,
     trafficMode: config.trafficMode,
     cdnPricingMode: config.cdnPricingMode,
     cdnPackagePrice: config.cdnPackagePrice,
     libraryTitles: Math.max(0, Math.round(libraryTitles)),
+    experienceCardSubs: 0,
+    vipCardSubs: 0,
     basicViewers: viewers,
     premiumViewers: 0,
-    basicMonthlySubs,
-    basicQuarterlySubs,
-    basicYearlySubs,
+    basicMonthlySubs: 0,
+    basicContinuousMonthlySubs: viewers,
+    basicQuarterlySubs: 0,
+    basicYearlySubs: 0,
     premiumMonthlySubs: 0,
+    premiumContinuousMonthlySubs: 0,
     premiumQuarterlySubs: 0,
     premiumYearlySubs: 0,
   };
@@ -184,10 +158,29 @@ function FitLineChart({
   const ys = series.flatMap((item) => item.points.map((point) => point.y));
   const maxV = Math.max(0, ...ys);
   const minV = Math.min(0, ...ys);
+  const basePoints = series[0]?.points ?? [];
+  const [hoverIndex, setHoverIndex] = useState<number | null>(null);
   const spanX = xMax || 1;
   const x = (value: number) => padL + (value / spanX) * innerW;
   const y = (value: number) => padT + ((maxV - value) / (maxV - minV || 1)) * innerH;
   const ticks = [0, 1, 2, 3, 4].map((i) => minV + ((maxV - minV) * i) / 4);
+  const hoverPoint = hoverIndex == null ? null : basePoints[hoverIndex] ?? null;
+
+  const handleHover = (clientX: number, bounds: DOMRect) => {
+    if (!basePoints.length) return;
+    const ratio = bounds.width > 0 ? (clientX - bounds.left) / bounds.width : 0;
+    const pointerX = padL + Math.min(1, Math.max(0, ratio)) * innerW;
+    let nearestIndex = 0;
+    let nearestDistance = Number.POSITIVE_INFINITY;
+    for (let index = 0; index < basePoints.length; index += 1) {
+      const distance = Math.abs(x(basePoints[index].x) - pointerX);
+      if (distance < nearestDistance) {
+        nearestDistance = distance;
+        nearestIndex = index;
+      }
+    }
+    setHoverIndex(nearestIndex);
+  };
 
   return (
     <div className="overflow-x-auto">
@@ -224,6 +217,51 @@ function FitLineChart({
             />
           );
         })}
+
+        {hoverPoint ? (
+          <g>
+            <line x1={x(hoverPoint.x)} y1={padT} x2={x(hoverPoint.x)} y2={height - padB} stroke="#64748b" strokeDasharray="3 3" />
+            {series.map((item) => {
+              const point = item.points[hoverIndex ?? 0];
+              return (
+                <g key={`${item.key}-hover`}>
+                  <circle cx={x(point.x)} cy={y(point.y)} r={4} fill={item.stroke} />
+                  <circle cx={x(point.x)} cy={y(point.y)} r={6} fill="none" stroke={item.stroke} strokeOpacity={0.35} />
+                </g>
+              );
+            })}
+            <g transform={`translate(${Math.min(width - 176, x(hoverPoint.x) + 12)} ${padT + 8})`}>
+              <rect width="164" height={28 + series.length * 18} rx="8" fill="#020617" fillOpacity="0.92" stroke="#1e293b" />
+              <text x="10" y="16" className="fill-slate-300" fontSize="10">
+                {xTick(hoverPoint.x)}
+              </text>
+              {series.map((item, index) => {
+                const point = item.points[hoverIndex ?? 0];
+                return (
+                  <g key={`${item.key}-value`} transform={`translate(10 ${32 + index * 18})`}>
+                    <circle cx="4" cy="-3" r="3" fill={item.stroke} />
+                    <text x="12" y="0" className="fill-slate-400" fontSize="10">
+                      {item.label}
+                    </text>
+                    <text x="144" y="0" textAnchor="end" className="fill-slate-200" fontSize="10">
+                      ¥ {formatCny(point.y)}
+                    </text>
+                  </g>
+                );
+              })}
+            </g>
+          </g>
+        ) : null}
+
+        <rect
+          x={padL}
+          y={padT}
+          width={innerW}
+          height={innerH}
+          fill="transparent"
+          onMouseMove={(e) => handleHover(e.clientX, e.currentTarget.getBoundingClientRect())}
+          onMouseLeave={() => setHoverIndex(null)}
+        />
 
         <text x={padL} y={height - 6} className="fill-slate-500" fontSize="10">
           {xStartLabel ?? xTick(0)}
@@ -298,7 +336,7 @@ export default function ThkcosFitCurveTab({ productId, fxRate }: { productId: nu
   const [simulate] = useSimulateUnitEconomicsThkcosVarsMutation();
 
   const [subtab, setSubtab] = useState<FitSubtabKey>('basic_eo_origin_tiered');
-  const [basicSubscribers, setBasicSubscribers] = useState(0);
+  const [continuousMonthlyUsers, setContinuousMonthlyUsers] = useState(0);
   const [libraryTitles, setLibraryTitles] = useState(0);
   const [subscriberCurve, setSubscriberCurve] = useState<CurvePoint[]>([]);
   const [titleCurve, setTitleCurve] = useState<CurvePoint[]>([]);
@@ -311,19 +349,19 @@ export default function ThkcosFitCurveTab({ productId, fxRate }: { productId: nu
 
   const baseVars = data?.vars ?? null;
   const activeSubtab = useMemo(() => FIT_SUBTABS.find((item) => item.key === subtab) ?? FIT_SUBTABS[0], [subtab]);
-  const baseSubscriberSeed = useMemo(() => (baseVars ? sumAllSubs(baseVars) : 0), [baseVars]);
+  const baseSubscriberSeed = useMemo(() => (baseVars ? basicContinuousMonthlySubsOf(baseVars) : 0), [baseVars]);
   const baseLibrarySeed = useMemo(() => (baseVars ? num(baseVars.libraryTitles) : 0), [baseVars]);
 
   useEffect(() => {
     if (!baseVars || initRef.current === productId) return;
     initRef.current = productId;
-    setBasicSubscribers(baseSubscriberSeed);
+    setContinuousMonthlyUsers(baseSubscriberSeed);
     setLibraryTitles(baseLibrarySeed);
   }, [baseLibrarySeed, baseSubscriberSeed, baseVars, productId]);
 
   const subscriberMax = useMemo(
-    () => niceMax(Math.max(baseSubscriberSeed, basicSubscribers, 50) * 2),
-    [baseSubscriberSeed, basicSubscribers]
+    () => niceMax(Math.max(baseSubscriberSeed, continuousMonthlyUsers, 50) * 2),
+    [baseSubscriberSeed, continuousMonthlyUsers]
   );
   const titleMax = useMemo(() => niceMax(Math.max(baseLibrarySeed, libraryTitles, 50) * 2), [baseLibrarySeed, libraryTitles]);
 
@@ -340,7 +378,7 @@ export default function ThkcosFitCurveTab({ productId, fxRate }: { productId: nu
         return res.results.neutral;
       };
 
-      const subscriberSamples = buildSamples(subscriberMax, basicSubscribers);
+      const subscriberSamples = buildSamples(subscriberMax, continuousMonthlyUsers);
       const titleSamples = buildSamples(titleMax, libraryTitles);
 
       try {
@@ -354,10 +392,10 @@ export default function ThkcosFitCurveTab({ productId, fxRate }: { productId: nu
           Promise.all(
             titleSamples.map(async (count) => ({
               x: count,
-              metrics: await callSimulation(buildScenarioVars(baseVars, basicSubscribers, count, subtab)),
+              metrics: await callSimulation(buildScenarioVars(baseVars, continuousMonthlyUsers, count, subtab)),
             }))
           ),
-          callSimulation(buildScenarioVars(baseVars, basicSubscribers, libraryTitles, subtab)),
+          callSimulation(buildScenarioVars(baseVars, continuousMonthlyUsers, libraryTitles, subtab)),
         ]);
 
         if (requestRef.current !== requestId) return;
@@ -388,16 +426,7 @@ export default function ThkcosFitCurveTab({ productId, fxRate }: { productId: nu
     }, 220);
 
     return () => clearTimeout(timer);
-  }, [baseVars, basicSubscribers, libraryTitles, productId, simulate, subscriberMax, subtab, titleMax]);
-
-  const currentBasicMix = useMemo(() => {
-    if (!baseVars) return '月卡 100%';
-    const total = sumBasicSubs(baseVars);
-    const month = total > 0 ? (num(baseVars.basicMonthlySubs) / total) * 100 : 100;
-    const quarter = total > 0 ? (num(baseVars.basicQuarterlySubs) / total) * 100 : 0;
-    const year = total > 0 ? (num(baseVars.basicYearlySubs) / total) * 100 : 0;
-    return `月卡 ${month.toFixed(0)}% · 季卡 ${quarter.toFixed(0)}% · 年卡 ${year.toFixed(0)}%`;
-  }, [baseVars]);
+  }, [baseVars, continuousMonthlyUsers, libraryTitles, productId, simulate, subscriberMax, subtab, titleMax]);
 
   if (isLoading) return <Empty text="加载拟合曲线…" />;
   if (!baseVars) return <Empty text="暂无 THKCOS 参数，无法生成拟合曲线" />;
@@ -406,10 +435,11 @@ export default function ThkcosFitCurveTab({ productId, fxRate }: { productId: nu
     <div className="space-y-4">
       <div className="rounded-xl border border-slate-800 bg-slate-900/60 px-4 py-3 text-[11px] leading-relaxed text-slate-400">
         基于当前产品最近保存的 <span className="text-slate-200">cf&THKCOS 全变量参数</span> 做中性口径拟合。此页固定其余变量，只调整
-        <span className="text-slate-200">「基础订阅用户数」</span> 与 <span className="text-slate-200">「片库影片数」</span>；
-        默认假设全部订阅用户均为基础会员，且 <span className="text-slate-200">基础用户观看人数 = 基础会员订阅人数</span>。
-        当前子场景固定为 <span className="text-slate-200">{activeSubtab.cn}</span>，基础会员订阅结构按当前基础会员配比缩放：
-        <span className="text-slate-200">{currentBasicMix}</span>。
+        <span className="text-slate-200">「基础会员连续包月用户数」</span> 与 <span className="text-slate-200">「片库影片数」</span>；
+        拟合中仅计算 <span className="text-slate-200">基础会员连续包月</span>，并固定
+        <span className="text-slate-200">基础用户观看人数 = 基础会员连续包月用户数</span>。
+        <span className="text-slate-200">体验卡 / 普通月卡 / VIP / 季卡 / 年卡 / 高级会员</span> 在此页均按 0 处理。
+        当前子场景固定为 <span className="text-slate-200">{activeSubtab.cn}</span>。
       </div>
 
       {error ? (
@@ -461,7 +491,7 @@ export default function ThkcosFitCurveTab({ productId, fxRate }: { productId: nu
               </Card>
               <Card className="p-4">
                 <div className="text-sm font-semibold text-sky-400">Break-even Subs</div>
-                <div className="mb-2 text-[11px] text-slate-500">盈亏平衡基础订阅人数</div>
+                <div className="mb-2 text-[11px] text-slate-500">盈亏平衡基础会员连续包月用户数</div>
                 <div className="text-xl font-semibold tabular-nums text-sky-400">
                   {currentMetrics.negativeUnitEconomics
                     ? '不可达'
@@ -485,15 +515,15 @@ export default function ThkcosFitCurveTab({ productId, fxRate }: { productId: nu
               {subscriberCurve.length > 0 ? (
                 <CurveCard
                   titleEn="Subscriber Fit Curve"
-                  titleCn="拟合曲线 · X 轴 = 基础订阅用户数"
+                  titleCn="拟合曲线 · X 轴 = 基础会员连续包月用户数"
                   xMax={subscriberMax}
                   xTick={(v) => `${formatInt(v)} 人`}
                   points={subscriberCurve}
-                  marker={{ x: basicSubscribers, label: `当前 ${formatInt(basicSubscribers)} 人` }}
+                  marker={{ x: continuousMonthlyUsers, label: `当前 ${formatInt(continuousMonthlyUsers)} 人` }}
                   summary={
                     <>
-                      在当前片库规模 <span className="text-slate-200">{formatInt(libraryTitles)} 部</span> 下，收入随基础订阅用户数增长，
-                      成本同时叠加流量支出。此图中高级会员收入与观看流量均按 0 处理。
+                      在当前片库规模 <span className="text-slate-200">{formatInt(libraryTitles)} 部</span> 下，收入随基础会员连续包月用户数增长，
+                      成本同时叠加流量支出。此图中体验卡、普通月卡、VIP、季卡、年卡与高级会员收入及流量均按 0 处理。
                     </>
                   }
                 />
@@ -509,7 +539,7 @@ export default function ThkcosFitCurveTab({ productId, fxRate }: { productId: nu
                   marker={{ x: libraryTitles, label: `当前 ${formatInt(libraryTitles)} 部` }}
                   summary={
                     <>
-                      在当前基础订阅用户数 <span className="text-slate-200">{formatInt(basicSubscribers)} 人</span> 下，片库规模主要通过
+                      在当前基础会员连续包月用户数 <span className="text-slate-200">{formatInt(continuousMonthlyUsers)} 人</span> 下，片库规模主要通过
                       R2 + COS 双副本存储成本影响总成本，收入保持不变，因此净利会随片库规模呈近线性变化。
                     </>
                   }
@@ -525,15 +555,15 @@ export default function ThkcosFitCurveTab({ productId, fxRate }: { productId: nu
               right={<span className="text-[11px] text-slate-500">{pending ? '正在重算曲线…' : '拖动滑杆即时刷新'}</span>}
             />
             <div className="grid gap-4 p-4 md:grid-cols-2">
-              <Field label="基础订阅用户数" hint="All subscribers are basic">
+              <Field label="基础会员连续包月用户数" hint="Basic continuous monthly only">
                 <div className="space-y-2">
                   <div className="relative">
                     <Input
                       type="number"
                       min="0"
                       step="1"
-                      value={String(basicSubscribers)}
-                      onChange={(e) => setBasicSubscribers(Math.max(0, Number(e.target.value) || 0))}
+                      value={String(continuousMonthlyUsers)}
+                      onChange={(e) => setContinuousMonthlyUsers(Math.max(0, Number(e.target.value) || 0))}
                       className="pr-12"
                     />
                     <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-slate-500">人</span>
@@ -543,8 +573,8 @@ export default function ThkcosFitCurveTab({ productId, fxRate }: { productId: nu
                     min="0"
                     max={subscriberMax}
                     step="1"
-                    value={basicSubscribers}
-                    onChange={(e) => setBasicSubscribers(Number(e.target.value))}
+                    value={continuousMonthlyUsers}
+                    onChange={(e) => setContinuousMonthlyUsers(Number(e.target.value))}
                     className="w-full accent-emerald-500"
                   />
                   <div className="flex justify-between text-[10px] text-slate-500">

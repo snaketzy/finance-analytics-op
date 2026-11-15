@@ -995,10 +995,20 @@ export type EconVars = {
   basicPerMinMbHigh: number | null;
   /** K2 高级会员每分钟流量上限 MB */
   premiumPerMinMbHigh: number | null;
+  /** X1 体验卡人数 */
+  experienceCardSubs: number | null;
+  /** Y1 体验卡固定单价 ¥ */
+  experienceCardPriceCny: number | null;
+  /** Z1 VIP卡人数（价格固定 0） */
+  vipCardSubs: number | null;
   /** L1 基础会员 · 月卡订阅人数 */
   basicMonthlySubs: number | null;
   /** M1 基础会员 · 月卡 ¥/月 */
   basicMonthlyPriceCny: number | null;
+  /** L11 基础会员 · 连续包月订阅人数 */
+  basicContinuousMonthlySubs: number | null;
+  /** M11 基础会员 · 连续包月 ¥/月 */
+  basicContinuousMonthlyPriceCny: number | null;
   /** L2 基础会员 · 季卡订阅人数（实收 ×3） */
   basicQuarterlySubs: number | null;
   /** M2 基础会员 · 季卡 ¥/月（实收 = ×3） */
@@ -1011,6 +1021,10 @@ export type EconVars = {
   premiumMonthlySubs: number | null;
   /** M4 高级会员 · 月卡 ¥/月 */
   premiumMonthlyPriceCny: number | null;
+  /** L41 高级会员 · 连续包月订阅人数 */
+  premiumContinuousMonthlySubs: number | null;
+  /** M41 高级会员 · 连续包月 ¥/月 */
+  premiumContinuousMonthlyPriceCny: number | null;
   /** L5 高级会员 · 季卡订阅人数（实收 ×3） */
   premiumQuarterlySubs: number | null;
   /** M5 高级会员 · 季卡 ¥/月（实收 = ×3） */
@@ -1205,6 +1219,12 @@ export type ThkcosVars = {
   basicPerMinMbHigh: number | null;
   /** K2 高级会员每分钟流量上限 MB */
   premiumPerMinMbHigh: number | null;
+  /** X1 体验卡人数 */
+  experienceCardSubs: number | null;
+  /** Y1 体验卡固定单价 ¥ */
+  experienceCardPriceCny: number | null;
+  /** Z1 VIP卡人数（价格固定 0） */
+  vipCardSubs: number | null;
   /** λ CDN 缓存命中率 0-1（仅 cdn 模式） */
   cacheHitRatio: number | null;
   /** 直连：COS 外网下行按量单价（沿用现有阶梯字段存储，取首档折算为 ¥/GB） */
@@ -1231,6 +1251,10 @@ export type ThkcosVars = {
   basicMonthlySubs: number | null;
   /** M1 基础会员 · 月卡 ¥/月 */
   basicMonthlyPriceCny: number | null;
+  /** L11 基础会员 · 连续包月订阅人数 */
+  basicContinuousMonthlySubs: number | null;
+  /** M11 基础会员 · 连续包月 ¥/月 */
+  basicContinuousMonthlyPriceCny: number | null;
   /** L2 基础会员 · 季卡订阅人数（实收 ×3） */
   basicQuarterlySubs: number | null;
   /** M2 基础会员 · 季卡 ¥/月（实收 = ×3） */
@@ -1243,6 +1267,10 @@ export type ThkcosVars = {
   premiumMonthlySubs: number | null;
   /** M4 高级会员 · 月卡 ¥/月 */
   premiumMonthlyPriceCny: number | null;
+  /** L41 高级会员 · 连续包月订阅人数 */
+  premiumContinuousMonthlySubs: number | null;
+  /** M41 高级会员 · 连续包月 ¥/月 */
+  premiumContinuousMonthlyPriceCny: number | null;
   /** L5 高级会员 · 季卡订阅人数（实收 ×3） */
   premiumQuarterlySubs: number | null;
   /** M5 高级会员 · 季卡 ¥/月（实收 = ×3） */

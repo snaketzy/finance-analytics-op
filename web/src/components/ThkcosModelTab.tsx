@@ -58,6 +58,9 @@ type Draft = {
   premiumPerMinMbLow: string;
   basicPerMinMbHigh: string;
   premiumPerMinMbHigh: string;
+  experienceCardSubs: string;
+  experienceCardPriceCny: string;
+  vipCardSubs: string;
   cacheHitRatioPct: string;
   /** 直连 COS 外网下行按量单价 ¥/GB（沿用现有阶梯字段存储）。 */
   cosDownPerGbCny: string;
@@ -82,12 +85,16 @@ type Draft = {
   eoDeductionRatio: string;
   basicMonthlySubs: string;
   basicMonthlyPriceCny: string;
+  basicContinuousMonthlySubs: string;
+  basicContinuousMonthlyPriceCny: string;
   basicQuarterlySubs: string;
   basicQuarterlyPriceCny: string;
   basicYearlySubs: string;
   basicYearlyPriceCny: string;
   premiumMonthlySubs: string;
   premiumMonthlyPriceCny: string;
+  premiumContinuousMonthlySubs: string;
+  premiumContinuousMonthlyPriceCny: string;
   premiumQuarterlySubs: string;
   premiumQuarterlyPriceCny: string;
   premiumYearlySubs: string;
@@ -110,8 +117,8 @@ const parsePct = (s: string): number | null => {
   return n === null ? null : n / 100;
 };
 
-const BASIC_SUB_KEYS: (keyof Draft)[] = ['basicMonthlySubs', 'basicQuarterlySubs', 'basicYearlySubs'];
-const PREMIUM_SUB_KEYS: (keyof Draft)[] = ['premiumMonthlySubs', 'premiumQuarterlySubs', 'premiumYearlySubs'];
+const BASIC_SUB_KEYS: (keyof Draft)[] = ['experienceCardSubs', 'basicMonthlySubs', 'basicContinuousMonthlySubs', 'basicQuarterlySubs', 'basicYearlySubs'];
+const PREMIUM_SUB_KEYS: (keyof Draft)[] = ['vipCardSubs', 'premiumMonthlySubs', 'premiumContinuousMonthlySubs', 'premiumQuarterlySubs', 'premiumYearlySubs'];
 
 function sumSubscriberInputs(draft: Draft, keys: (keyof Draft)[]) {
   return keys.reduce((sum, key) => {
@@ -252,6 +259,9 @@ function toDraft(v: ThkcosVars): Draft {
     premiumPerMinMbLow: numStr(v.premiumPerMinMbLow),
     basicPerMinMbHigh: numStr(v.basicPerMinMbHigh),
     premiumPerMinMbHigh: numStr(v.premiumPerMinMbHigh),
+    experienceCardSubs: numStr(v.experienceCardSubs),
+    experienceCardPriceCny: numStr(v.experienceCardPriceCny ?? 9.9),
+    vipCardSubs: numStr(v.vipCardSubs),
     cacheHitRatioPct: pctStr(v.cacheHitRatio),
     cosDownPerGbCny: singleTierToPerGb(v.cosDownTiers),
     eoOveragePrices: tiersToPrices(v.eoOverageTiers, EO_OVERAGE_TIER_BOUNDS),
@@ -267,12 +277,16 @@ function toDraft(v: ThkcosVars): Draft {
     eoDeductionRatio: numStr(v.eoDeductionRatio),
     basicMonthlySubs: numStr(v.basicMonthlySubs),
     basicMonthlyPriceCny: numStr(v.basicMonthlyPriceCny),
+    basicContinuousMonthlySubs: numStr(v.basicContinuousMonthlySubs),
+    basicContinuousMonthlyPriceCny: numStr(v.basicContinuousMonthlyPriceCny),
     basicQuarterlySubs: numStr(v.basicQuarterlySubs),
     basicQuarterlyPriceCny: numStr(v.basicQuarterlyPriceCny),
     basicYearlySubs: numStr(v.basicYearlySubs),
     basicYearlyPriceCny: numStr(v.basicYearlyPriceCny),
     premiumMonthlySubs: numStr(v.premiumMonthlySubs),
     premiumMonthlyPriceCny: numStr(v.premiumMonthlyPriceCny),
+    premiumContinuousMonthlySubs: numStr(v.premiumContinuousMonthlySubs),
+    premiumContinuousMonthlyPriceCny: numStr(v.premiumContinuousMonthlyPriceCny),
     premiumQuarterlySubs: numStr(v.premiumQuarterlySubs),
     premiumQuarterlyPriceCny: numStr(v.premiumQuarterlyPriceCny),
     premiumYearlySubs: numStr(v.premiumYearlySubs),
@@ -304,6 +318,9 @@ function draftToVars(d: Draft): ThkcosVars {
     premiumPerMinMbLow: parseNum(d.premiumPerMinMbLow),
     basicPerMinMbHigh: parseNum(d.basicPerMinMbHigh),
     premiumPerMinMbHigh: parseNum(d.premiumPerMinMbHigh),
+    experienceCardSubs: parseNum(d.experienceCardSubs),
+    experienceCardPriceCny: parseNum(d.experienceCardPriceCny),
+    vipCardSubs: parseNum(d.vipCardSubs),
     cacheHitRatio: parsePct(d.cacheHitRatioPct),
     cosDownTiers: perGbToSingleTier(d.cosDownPerGbCny),
     eoOverageTiers: pricesToTiers(d.eoOveragePrices, EO_OVERAGE_TIER_BOUNDS),
@@ -317,12 +334,16 @@ function draftToVars(d: Draft): ThkcosVars {
     eoDeductionRatio: parseNum(d.eoDeductionRatio),
     basicMonthlySubs: parseNum(d.basicMonthlySubs),
     basicMonthlyPriceCny: parseNum(d.basicMonthlyPriceCny),
+    basicContinuousMonthlySubs: parseNum(d.basicContinuousMonthlySubs),
+    basicContinuousMonthlyPriceCny: parseNum(d.basicContinuousMonthlyPriceCny),
     basicQuarterlySubs: parseNum(d.basicQuarterlySubs),
     basicQuarterlyPriceCny: parseNum(d.basicQuarterlyPriceCny),
     basicYearlySubs: parseNum(d.basicYearlySubs),
     basicYearlyPriceCny: parseNum(d.basicYearlyPriceCny),
     premiumMonthlySubs: parseNum(d.premiumMonthlySubs),
     premiumMonthlyPriceCny: parseNum(d.premiumMonthlyPriceCny),
+    premiumContinuousMonthlySubs: parseNum(d.premiumContinuousMonthlySubs),
+    premiumContinuousMonthlyPriceCny: parseNum(d.premiumContinuousMonthlyPriceCny),
     premiumQuarterlySubs: parseNum(d.premiumQuarterlySubs),
     premiumQuarterlyPriceCny: parseNum(d.premiumQuarterlyPriceCny),
     premiumYearlySubs: parseNum(d.premiumYearlySubs),
@@ -352,6 +373,9 @@ const EMPTY_VARS: ThkcosVars = {
   premiumPerMinMbLow: null,
   basicPerMinMbHigh: null,
   premiumPerMinMbHigh: null,
+  experienceCardSubs: null,
+  experienceCardPriceCny: 9.9,
+  vipCardSubs: null,
   cacheHitRatio: null,
   cosDownTiers: null,
   eoOverageTiers: null,
@@ -365,12 +389,16 @@ const EMPTY_VARS: ThkcosVars = {
   eoDeductionRatio: null,
   basicMonthlySubs: null,
   basicMonthlyPriceCny: null,
+  basicContinuousMonthlySubs: null,
+  basicContinuousMonthlyPriceCny: null,
   basicQuarterlySubs: null,
   basicQuarterlyPriceCny: null,
   basicYearlySubs: null,
   basicYearlyPriceCny: null,
   premiumMonthlySubs: null,
   premiumMonthlyPriceCny: null,
+  premiumContinuousMonthlySubs: null,
+  premiumContinuousMonthlyPriceCny: null,
   premiumQuarterlySubs: null,
   premiumQuarterlyPriceCny: null,
   premiumYearlySubs: null,
@@ -438,11 +466,21 @@ const GROUPS: { cn: string; en: string; fields: FieldDef[] }[] = [
     ],
   },
   {
+    cn: '订阅收入 · 体验会员（月度确认口径）',
+    en: 'Trial Subscription',
+    fields: [
+      { key: 'experienceCardSubs', label: 'X1 · 体验卡人数', hint: 'Trial Card', unit: '人', placeholder: '如 200' },
+      { key: 'experienceCardPriceCny', label: 'Y1 · 体验卡单价', hint: 'Trial · ¥/月', unit: '¥', step: '0.1', placeholder: '如 9.9' },
+    ],
+  },
+  {
     cn: '订阅收入 · 基础会员（月度确认口径）',
     en: 'Basic Subscription',
     fields: [
       { key: 'basicMonthlySubs', label: 'L1 · 月卡人数', hint: 'Basic · Monthly', unit: '人', placeholder: '如 800' },
       { key: 'basicMonthlyPriceCny', label: 'M1 · 月卡单价', hint: 'Basic · ¥/月', unit: '¥', placeholder: '如 30' },
+      { key: 'basicContinuousMonthlySubs', label: 'L11 · 连续包月会员', hint: 'Basic · Auto Renew', unit: '人', placeholder: '如 500' },
+      { key: 'basicContinuousMonthlyPriceCny', label: 'M11 · 连续包月单价', hint: 'Basic · Auto Renew ¥/月', unit: '¥', placeholder: '如 28' },
       { key: 'basicQuarterlySubs', label: 'L2 · 季卡人数', hint: '实收 ×3', unit: '人', placeholder: '如 300' },
       { key: 'basicQuarterlyPriceCny', label: 'M2 · 季卡单价', hint: '¥/月 × 3', unit: '¥', placeholder: '如 25', mult: 3 },
       { key: 'basicYearlySubs', label: 'L3 · 年卡人数', hint: '实收 ×12', unit: '人', placeholder: '如 200' },
@@ -455,11 +493,18 @@ const GROUPS: { cn: string; en: string; fields: FieldDef[] }[] = [
     fields: [
       { key: 'premiumMonthlySubs', label: 'L4 · 月卡人数', hint: 'Premium · Monthly', unit: '人', placeholder: '如 300' },
       { key: 'premiumMonthlyPriceCny', label: 'M4 · 月卡单价', hint: 'Premium · ¥/月', unit: '¥', placeholder: '如 68' },
+      { key: 'premiumContinuousMonthlySubs', label: 'L41 · 连续包月会员', hint: 'Premium · Auto Renew', unit: '人', placeholder: '如 180' },
+      { key: 'premiumContinuousMonthlyPriceCny', label: 'M41 · 连续包月单价', hint: 'Premium · Auto Renew ¥/月', unit: '¥', placeholder: '如 65' },
       { key: 'premiumQuarterlySubs', label: 'L5 · 季卡人数', hint: '实收 ×3', unit: '人', placeholder: '如 120' },
       { key: 'premiumQuarterlyPriceCny', label: 'M5 · 季卡单价', hint: '¥/月 × 3', unit: '¥', placeholder: '如 58', mult: 3 },
       { key: 'premiumYearlySubs', label: 'L6 · 年卡人数', hint: '实收 ×12', unit: '人', placeholder: '如 80' },
       { key: 'premiumYearlyPriceCny', label: 'M6 · 年卡单价', hint: '¥/月 × 12', unit: '¥', placeholder: '如 48', mult: 12 },
     ],
+  },
+  {
+    cn: '订阅收入 · VIP会员（月度确认口径）',
+    en: 'VIP Subscription',
+    fields: [{ key: 'vipCardSubs', label: 'Z1 · VIP卡人数', hint: 'VIP · ¥0', unit: '人', placeholder: '如 60' }],
   },
   {
     cn: '推演参数',
@@ -1064,9 +1109,9 @@ export default function ThkcosModelTab({ productId, fxRate }: { productId: numbe
                     (f.key === 'premiumViewers' && viewerValue != null && viewerValue > premiumSubscriberLimit);
                   const viewerHint = viewerExceeded
                     ? f.key === 'basicViewers'
-                      ? `已超过基础会员订阅总人数（L1+L2+L3，当前上限 ${formatInt(basicSubscriberLimit)} 人）`
+                      ? `已超过基础会员订阅总人数（X1+L1+L11+L2+L3，当前上限 ${formatInt(basicSubscriberLimit)} 人）`
                       : f.key === 'premiumViewers'
-                        ? `已超过高级会员订阅总人数（L4+L5+L6，当前上限 ${formatInt(premiumSubscriberLimit)} 人）`
+                        ? `已超过高级会员订阅总人数（Z1+L4+L41+L5+L6，当前上限 ${formatInt(premiumSubscriberLimit)} 人）`
                         : null
                     : null;
                   return (
