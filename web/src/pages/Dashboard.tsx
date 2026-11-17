@@ -92,7 +92,7 @@ export default function Dashboard() {
         {isLoading && <div className="mb-4 text-xs text-slate-500">加载中…</div>}
         {isError && (
           <div className="mb-4 text-xs text-rose-400">
-            加载失败，请确认后端服务已启动（http://localhost:8792）。
+            加载失败，请确认后端服务已启动（http://localhost:6168）。
           </div>
         )}
 

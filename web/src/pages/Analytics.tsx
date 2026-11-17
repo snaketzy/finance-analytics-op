@@ -127,7 +127,7 @@ export function AnalyticsView({ direction }: { direction: Direction }) {
         </PageHeader>
 
         {isError && (
-          <div className="mb-4 text-xs text-rose-400">加载失败，请确认后端服务已启动（http://localhost:8792）。</div>
+          <div className="mb-4 text-xs text-rose-400">加载失败，请确认后端服务已启动（http://localhost:6168）。</div>
         )}
 
         <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">

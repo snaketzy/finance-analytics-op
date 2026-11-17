@@ -1,8 +1,8 @@
 import 'dotenv/config';
 
 export const env = {
-  port: Number(process.env.PORT ?? 8791),
-  webOrigin: process.env.WEB_ORIGIN ?? 'http://localhost:5169',
+  port: Number(process.env.PORT ?? 6168),
+  webOrigin: process.env.WEB_ORIGIN ?? 'http://localhost:5168',
   /** 汇率线上数据源（frankfurter / ECB），可用 env 覆盖以便测试。 */
   fxApiBase: process.env.FX_API_BASE ?? 'https://api.frankfurter.dev/v1',
   /** Cloudflare 用量采集（R2 等），未配置时预览/计费会要求手工录入用量。 */
